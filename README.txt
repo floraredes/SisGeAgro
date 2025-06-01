@@ -1,0 +1,1 @@
+En esta modificacion se eliminan archivos innecesarios y se optimiza el funcionamiento d la app.
