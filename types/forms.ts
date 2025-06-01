@@ -19,8 +19,12 @@ export interface MovementFormData {
   selectedTaxes: Tax[]
   // Nuevos campos para pagos de impuestos
   isTaxPayment: boolean
+<<<<<<< HEAD
   relatedTaxId: string | null
   check: boolean
+=======
+  relatedTaxId: number | null // Cambiado de string a number para coincidir con BIGINT
+>>>>>>> origin/main
 }
 
 export interface Tax {

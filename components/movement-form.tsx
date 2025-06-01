@@ -58,9 +58,15 @@ export function MovementForm({
     entityName: "",
     entityId: "",
     selectedTaxes: [],
+<<<<<<< HEAD
     isTaxPayment: false,
     relatedTaxId: null,
     check: false,
+=======
+    // Inicializar los nuevos campos
+    isTaxPayment: false,
+    relatedTaxId: null,
+>>>>>>> origin/main
   })
   const [billNumberError, setBillNumberError] = useState<string | null>(null)
   const [cuitCuilError, setCuitCuilError] = useState<string | null>(null)
@@ -103,9 +109,15 @@ export function MovementForm({
         entityName: existingData.empresa || "",
         entityId: existingData.entityId || "",
         selectedTaxes: existingData.taxes || [],
+<<<<<<< HEAD
         isTaxPayment: existingData.isTaxPayment || false,
         relatedTaxId: existingData.relatedTaxId || null,
         check: existingData.check || false,
+=======
+        // Cargar los campos de pago de impuestos si existen
+        isTaxPayment: existingData.isTaxPayment || false,
+        relatedTaxId: existingData.relatedTaxId || null,
+>>>>>>> origin/main
       })
     }
   }, [isEditMode, existingData, open, defaultMovementType])
@@ -168,7 +180,10 @@ export function MovementForm({
       selectedTaxes: [],
       isTaxPayment: false,
       relatedTaxId: null,
+<<<<<<< HEAD
       check: false,
+=======
+>>>>>>> origin/main
     })
     setBillNumberError(null)
     setCuitCuilError(null)
@@ -418,7 +433,10 @@ export function MovementForm({
             sub_category_id: subcategoryData.id,
             is_tax_payment: formData.isTaxPayment,
             related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
+<<<<<<< HEAD
             check: formData.check,
+=======
+>>>>>>> origin/main
           })
           .eq("id", existingData.id)
 
@@ -598,10 +616,16 @@ export function MovementForm({
               movement_type: formData.movementType,
               operation_id: operationData.id,
               sub_category_id: subcategoryData.id,
+<<<<<<< HEAD
               created_by: currentUser.id,
               is_tax_payment: formData.isTaxPayment,
               related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
               check: formData.check,
+=======
+              created_by: currentUser.id, // Usar el ID del usuario actual (UUID)
+              is_tax_payment: formData.isTaxPayment,
+              related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
+>>>>>>> origin/main
             },
           ])
           .select()
@@ -959,6 +983,7 @@ export function MovementForm({
                     />
                   </div>
                 )}
+<<<<<<< HEAD
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -973,6 +998,8 @@ export function MovementForm({
                   />
                   <Label htmlFor="check">Marcar como verificado</Label>
                 </div>
+=======
+>>>>>>> origin/main
               </div>
 
               <Button type="submit" className="w-full bg-[#4F7942] hover:bg-[#3F6932]" disabled={loading}>
