@@ -21,450 +21,330 @@ import { DashboardStats } from "@/components/dashboard-stats"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { ArrowLeftRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useCurrency } from "@/contexts/currency-context"
+import { Input } from "@/components/ui/input"
 
-// Añadir esta función para obtener fechas de inicio y fin de un mes
-function getMonthDates(year: number, month: number) {
-  const startDate = `${year}-${month.toString().padStart(2, "0")}-01`
-  const endDate = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate()}`
-  return { startDate, endDate }
+
+function getLocalDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-// Modificar la función para aceptar año y mes como parámetros
-async function getCumulativeMovements(year: number, month: number) {
-  const { startDate, endDate } = getMonthDates(year, month)
+function parseLocalDate(str: string) {
+  // str: 'YYYY-MM-DD'
+  const [year, month, day] = str.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
 
-  // Obtener todos los movimientos del mes con sus facturas
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      movement_type,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      )
-    `)
-    .or(`movement_type.eq.ingreso,movement_type.eq.egreso`)
+function getMonthRangeString(startDate: string, endDate: string) {
+  const [startYear, startMonth] = startDate.split('-')
+  const [endYear, endMonth] = endDate.split('-')
+  const startDateObj = new Date(Number(startYear), Number(startMonth) - 1, 1)
+  const endDateObj = new Date(Number(endYear), Number(endMonth) - 1, 1)
+  const startMonthName = startDateObj.toLocaleString('es-ES', { month: 'long' })
+  const endMonthName = endDateObj.toLocaleString('es-ES', { month: 'long' })
+  if (startMonthName === endMonthName) {
+    return startMonthName.charAt(0).toUpperCase() + startMonthName.slice(1)
+  }
+  return `${startMonthName.charAt(0).toUpperCase() + startMonthName.slice(1)} - ${endMonthName}`
+}
 
-  if (error) throw error
-
-  // Filtrar por fecha de factura dentro del mes
-  const filteredData = data.filter((movement) => {
-    const billDate = movement.operations?.bills?.bill_date
-    return billDate && billDate >= startDate && billDate <= endDate
+// Reemplazar la función export default con la siguiente implementación
+export default function DashboardPage() {
+  // Calcular fechas por defecto
+  const today = new Date()
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  // Leer de localStorage o usar por defecto
+  const [startDate, setStartDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("dashboardStartDate") || getLocalDateString(firstDay)
+    }
+    return getLocalDateString(firstDay)
+  })
+  const [endDate, setEndDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("dashboardEndDate") || getLocalDateString(lastDay)
+    }
+    return getLocalDateString(lastDay)
   })
 
-  // Crear un objeto para almacenar los totales por día
-  const dailyTotals: Record<string, { day: string; ingresos: number; egresos: number }> = {}
+  // Guardar en localStorage cuando cambian
+  useEffect(() => {
+    if (startDate) localStorage.setItem("dashboardStartDate", startDate)
+  }, [startDate])
+  useEffect(() => {
+    if (endDate) localStorage.setItem("dashboardEndDate", endDate)
+  }, [endDate])
 
-  // Inicializar todos los días del mes con valores en cero
-  const daysInMonth = new Date(year, month, 0).getDate()
-  for (let i = 1; i <= daysInMonth; i++) {
-    const dayStr = i.toString().padStart(2, "0")
-    dailyTotals[dayStr] = {
-      day: dayStr,
-      ingresos: 0,
-      egresos: 0,
+  // Estado para todos los movimientos del año
+  const [movements, setMovements] = useState<any[]>([])
+  const [loadingMovements, setLoadingMovements] = useState(true)
+
+  // Al cargar, traer todos los movimientos del año
+  useEffect(() => {
+    async function fetchMovements() {
+      setLoadingMovements(true)
+      try {
+        const year = new Date().getFullYear()
+        const yearStart = `${year}-01-01`
+        const yearEnd = `${year}-12-31`
+        const { data, error } = await supabase
+          .from("movements")
+          .select(`
+            movement_type,
+            description,
+            sub_category_id,
+            operations:operation_id (
+              bills:bill_id (
+                bill_amount,
+                bill_date
+              )
+            ),
+            movement_taxes (
+              calculated_amount
+            ),
+            sub_categories:sub_category_id (
+              categories:category_id (
+                description
+              )
+            )
+          `)
+          .gte("operations.bills.bill_date", yearStart)
+          .lte("operations.bills.bill_date", yearEnd)
+        if (error) throw error
+        setMovements(data || [])
+      } catch (error) {
+        console.error("Error fetching movements:", error)
+      } finally {
+        setLoadingMovements(false)
+      }
     }
+    fetchMovements()
+  }, [])
+
+  // Función para filtrar movimientos por rango de fechas
+  function filterMovementsByDate(movs: any[], start: string, end: string) {
+    return movs.filter((movement) => {
+      let bills: any[] = []
+      if (Array.isArray(movement.operations)) {
+        movement.operations.forEach((op: any) => {
+          if (Array.isArray(op.bills)) {
+            bills = bills.concat(op.bills)
+          }
+        })
+      } else if ((movement.operations as any)?.bills) {
+        bills = Array.isArray((movement.operations as any).bills) ? (movement.operations as any).bills : [(movement.operations as any).bills]
+      }
+      // Al menos un bill en rango
+      return bills.some(b => b.bill_date && b.bill_date >= start && b.bill_date <= end)
+    })
   }
 
-  // Sumar los montos por día y tipo de movimiento
-  filteredData.forEach((movement) => {
-    const billDate = movement.operations?.bills?.bill_date
-    if (billDate) {
-      const day = billDate.split("-")[2] // Extraer el día de la fecha (formato: YYYY-MM-DD)
-      const amount = movement.operations?.bills?.bill_amount || 0
+  // Función para obtener el bill principal de un movimiento en el rango
+  function getBillInRange(movement: any, start: string, end: string) {
+    let bills: any[] = []
+    if (Array.isArray(movement.operations)) {
+      movement.operations.forEach((op: any) => {
+        if (Array.isArray(op.bills)) {
+          bills = bills.concat(op.bills)
+        }
+      })
+    } else if ((movement.operations as any)?.bills) {
+      bills = Array.isArray((movement.operations as any).bills) ? (movement.operations as any).bills : [(movement.operations as any).bills]
+    }
+    return bills.find(b => b.bill_date && b.bill_date >= start && b.bill_date <= end)
+  }
 
+  // Función para calcular totales para las cards
+  function calculateTotals(movs: any[], start: string, end: string) {
+    let income = 0
+    let expense = 0
+    let taxes = 0
+    movs.forEach((movement) => {
+      const bill = getBillInRange(movement, start, end)
+      if (!bill) return
+      const amount = bill.bill_amount || 0
+      const taxesAmount = movement.movement_taxes?.reduce((sum: any, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0
+      if (movement.movement_type === "ingreso") {
+        income += amount
+        taxes -= taxesAmount
+      } else if (movement.movement_type === "egreso") {
+        expense += amount
+        taxes += taxesAmount
+      }
+    })
+    return { income, expense, taxes }
+  }
+
+  // Función para datos de gráficos acumulados por día
+  function getCumulativeData(movs: any[], start: string, end: string) {
+    const startD = parseLocalDate(start)
+    const endD = parseLocalDate(end)
+    const days: string[] = []
+    let d = new Date(startD)
+    while (d <= endD) {
+      days.push(getLocalDateString(d))
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+    }
+    const dailyTotals: Record<string, { day: string; ingresos: number; egresos: number }> = {}
+    days.forEach(day => {
+      dailyTotals[day] = { day, ingresos: 0, egresos: 0 }
+    })
+    filterMovementsByDate(movs, start, end).forEach((movement) => {
+      const bill = getBillInRange(movement, start, end)
+      if (!bill) return
+      const day = bill.bill_date
+      const amount = bill.bill_amount || 0
       if (movement.movement_type === "ingreso") {
         dailyTotals[day].ingresos += amount
       } else if (movement.movement_type === "egreso") {
         dailyTotals[day].egresos += amount
       }
-    }
-  })
-
-  // Convertir a array y ordenar por día
-  const sortedDays = Object.keys(dailyTotals).sort((a, b) => Number.parseInt(a) - Number.parseInt(b))
-
-  // Calcular valores acumulativos
-  let cumulativeIngresos = 0
-  let cumulativeEgresos = 0
-
-  const cumulativeData = sortedDays.map((day) => {
-    cumulativeIngresos += dailyTotals[day].ingresos
-    cumulativeEgresos += dailyTotals[day].egresos
-
-    return {
-      day,
-      ingresos: cumulativeIngresos,
-      egresos: cumulativeEgresos,
-      balance: cumulativeIngresos - cumulativeEgresos,
-    }
-  })
-
-  return cumulativeData
-}
-
-// Modificar la función para aceptar año y mes como parámetros
-async function getExpensesByCategory(year: number, month: number) {
-  const { startDate, endDate } = getMonthDates(year, month)
-
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      sub_category_id,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      ),
-      sub_categories:sub_category_id (
-        categories:category_id (
-          description
-        )
-      )
-    `)
-    .eq("movement_type", "egreso")
-
-  if (error) throw error
-
-  // Filtrar por fecha dentro del mes seleccionado
-  const filteredData = data.filter((movement) => {
-    const billDate = movement.operations?.bills?.bill_date
-    return billDate && billDate >= startDate && billDate <= endDate
-  })
-
-  // Agrupar por categoría
-  const categoryTotals: Record<string, number> = {}
-
-  filteredData.forEach((movement) => {
-    const categoryName = movement.sub_categories?.categories?.description || "Sin categoría"
-    const amount = movement.operations?.bills?.bill_amount || 0
-
-    if (!categoryTotals[categoryName]) {
-      categoryTotals[categoryName] = 0
-    }
-    categoryTotals[categoryName] += amount
-  })
-
-  // Convertir a array para el gráfico
-  return Object.entries(categoryTotals)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value) // Ordenar de mayor a menor
-    .slice(0, 5) // Tomar los 5 principales
-}
-
-// Modificar la función para aceptar año y mes como parámetros
-async function getIncomesByCategory(year: number, month: number) {
-  const { startDate, endDate } = getMonthDates(year, month)
-
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      sub_category_id,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      ),
-      sub_categories:sub_category_id (
-        categories:category_id (
-          description
-        )
-      )
-    `)
-    .eq("movement_type", "ingreso")
-
-  if (error) throw error
-
-  // Filtrar por fecha dentro del mes seleccionado
-  const filteredData = data.filter((movement) => {
-    const billDate = movement.operations?.bills?.bill_date
-    return billDate && billDate >= startDate && billDate <= endDate
-  })
-
-  // Agrupar por categoría
-  const categoryTotals: Record<string, number> = {}
-
-  filteredData.forEach((movement) => {
-    const categoryName = movement.sub_categories?.categories?.description || "Sin categoría"
-    const amount = movement.operations?.bills?.bill_amount || 0
-
-    if (!categoryTotals[categoryName]) {
-      categoryTotals[categoryName] = 0
-    }
-    categoryTotals[categoryName] += amount
-  })
-
-  // Convertir a array para el gráfico
-  return Object.entries(categoryTotals)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value) // Ordenar de mayor a menor
-    .slice(0, 5) // Tomar los 5 principales
-}
-
-// Modificar la función para aceptar año y mes como parámetros
-async function getMonthlyMovements(selectedYear: number, selectedMonth: number) {
-  // Calcular fecha de inicio (12 meses atrás desde el mes seleccionado)
-  const selectedDate = new Date(selectedYear, selectedMonth - 1, 1)
-  const endDate = new Date(selectedYear, selectedMonth, 0).toISOString().split("T")[0]
-
-  const startDate = new Date(selectedDate)
-  startDate.setMonth(selectedDate.getMonth() - 11) // 12 meses incluyendo el seleccionado
-  startDate.setDate(1) // Primer día del mes
-  const startDateStr = startDate.toISOString().split("T")[0]
-
-  // Obtener todos los movimientos en el rango de fechas
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      movement_type,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      )
-    `)
-    .or(`movement_type.eq.ingreso,movement_type.eq.egreso`)
-    .gte("operations.bills.bill_date", startDateStr)
-    .lte("operations.bills.bill_date", endDate)
-
-  if (error) throw error
-
-  // Crear objeto para almacenar totales por mes
-  const monthlyTotals: Record<string, { month: string; ingresos: number; egresos: number; balance: number }> = {}
-
-  // Inicializar los últimos 12 meses con valores en cero
-  for (let i = 0; i < 12; i++) {
-    const monthDate = new Date(selectedDate)
-    monthDate.setMonth(selectedDate.getMonth() - i)
-
-    const year = monthDate.getFullYear()
-    const month = monthDate.getMonth() + 1
-
-    // Formato YYYY-MM para agrupar
-    const monthKey = `${year}-${month.toString().padStart(2, "0")}`
-
-    // Nombre del mes para mostrar en el gráfico
-    const monthName = monthDate.toLocaleString("es-ES", { month: "short" })
-
-    monthlyTotals[monthKey] = {
-      month: monthName,
-      ingresos: 0,
-      egresos: 0,
-      balance: 0,
-    }
+    })
+    let cumulativeIngresos = 0
+    let cumulativeEgresos = 0
+    return days.map(day => {
+      cumulativeIngresos += dailyTotals[day].ingresos
+      cumulativeEgresos += dailyTotals[day].egresos
+      return {
+        day,
+        ingresos: cumulativeIngresos,
+        egresos: cumulativeEgresos,
+        balance: cumulativeIngresos - cumulativeEgresos,
+      }
+    })
   }
 
-  // Sumar los montos por mes y tipo de movimiento
-  data?.forEach((movement) => {
-    const billDate = movement.operations?.bills?.bill_date
-    if (billDate) {
-      // Extraer año y mes de la fecha (formato: YYYY-MM-DD)
-      const [year, month] = billDate.split("-")
+  // Función para categorías de egresos
+  function getExpensesByCategory(movs: any[], start: string, end: string) {
+    const categoryTotals: Record<string, number> = {}
+    filterMovementsByDate(movs, start, end).forEach((movement) => {
+      if (movement.movement_type !== "egreso") return
+      const bill = getBillInRange(movement, start, end)
+      if (!bill) return
+      const categoryName = movement.sub_categories?.categories?.description || "Sin categoría"
+      const amount = bill.bill_amount || 0
+      if (!categoryTotals[categoryName]) categoryTotals[categoryName] = 0
+      categoryTotals[categoryName] += amount
+    })
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+  }
+
+  // Función para categorías de ingresos
+  function getIncomesByCategory(movs: any[], start: string, end: string) {
+    const categoryTotals: Record<string, number> = {}
+    filterMovementsByDate(movs, start, end).forEach((movement) => {
+      if (movement.movement_type !== "ingreso") return
+      const bill = getBillInRange(movement, start, end)
+      if (!bill) return
+      const categoryName = movement.sub_categories?.categories?.description || "Sin categoría"
+      const amount = bill.bill_amount || 0
+      if (!categoryTotals[categoryName]) categoryTotals[categoryName] = 0
+      categoryTotals[categoryName] += amount
+    })
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+  }
+
+  // Función para top ingresos
+  function getTopIncomes(movs: any[], start: string, end: string) {
+    return filterMovementsByDate(movs, start, end)
+      .filter(m => m.movement_type === "ingreso")
+      .map(m => {
+        const bill = getBillInRange(m, start, end)
+        return {
+          id: m.id,
+          description: m.description,
+          amount: bill?.bill_amount || 0,
+        }
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }
+
+  // Función para top egresos
+  function getTopExpenses(movs: any[], start: string, end: string) {
+    return filterMovementsByDate(movs, start, end)
+      .filter(m => m.movement_type === "egreso")
+      .map(m => {
+        const bill = getBillInRange(m, start, end)
+        return {
+          id: m.id,
+          description: m.description,
+          amount: bill?.bill_amount || 0,
+        }
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }
+
+  // Función para comparativa mensual (últimos 12 meses dentro del año)
+  function getMonthlyMovements(movs: any[], start: string, end: string) {
+    const startD = parseLocalDate(start)
+    const endD = parseLocalDate(end)
+    const months: string[] = []
+    let d = new Date(startD.getFullYear(), startD.getMonth(), 1)
+    while (d <= endD) {
+      months.push(`${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`)
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+    }
+    const monthlyTotals: Record<string, { month: string; ingresos: number; egresos: number; balance: number }> = {}
+    months.forEach(monthKey => {
+      const date = parseLocalDate(monthKey + "-01")
+      const monthName = date.toLocaleString("es-ES", { month: "short" })
+      monthlyTotals[monthKey] = { month: monthName, ingresos: 0, egresos: 0, balance: 0 }
+    })
+    filterMovementsByDate(movs, start, end).forEach((movement) => {
+      const bill = getBillInRange(movement, start, end)
+      if (!bill) return
+      const [year, month] = bill.bill_date.split("-")
       const monthKey = `${year}-${month}`
-
-      // Verificar si el mes está dentro de nuestro rango (últimos 12 meses)
       if (monthlyTotals[monthKey]) {
-        const amount = movement.operations?.bills?.bill_amount || 0
-
+        const amount = bill.bill_amount || 0
         if (movement.movement_type === "ingreso") {
           monthlyTotals[monthKey].ingresos += amount
         } else if (movement.movement_type === "egreso") {
           monthlyTotals[monthKey].egresos += amount
         }
       }
-    }
-  })
+    })
+    Object.keys(monthlyTotals).forEach(key => {
+      monthlyTotals[key].balance = monthlyTotals[key].ingresos - monthlyTotals[key].egresos
+    })
+    return Object.entries(monthlyTotals)
+      .map(([key, data]) => ({ monthKey: key, ...data }))
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+  }
 
-  // Calcular balance para cada mes
-  Object.keys(monthlyTotals).forEach((key) => {
-    monthlyTotals[key].balance = monthlyTotals[key].ingresos - monthlyTotals[key].egresos
-  })
-
-  // Convertir a array y ordenar por fecha (de más antiguo a más reciente)
-  return Object.entries(monthlyTotals)
-    .map(([key, data]) => ({
-      monthKey: key,
-      ...data,
-    }))
-    .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
-}
-
-async function getTopIncomesOfMonth(year: number, month: number) {
-  const { startDate, endDate } = getMonthDates(year, month)
-
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      id,
-      description,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      )
-    `)
-    .eq("movement_type", "ingreso")
-    .gte("operations.bills.bill_date", startDate)
-    .lte("operations.bills.bill_date", endDate)
-
-  if (error) throw error
-
-  const incomes = data.map((income) => ({
-    id: income.id,
-    description: income.description,
-    amount: income.operations?.bills?.bill_amount || 0,
-  }))
-
-  // Ordenar por monto de mayor a menor y tomar los 5 primeros
-  return incomes.sort((a, b) => b.amount - a.amount).slice(0, 5)
-}
-
-async function getTopExpensesOfMonth(year: number, month: number) {
-  const { startDate, endDate } = getMonthDates(year, month)
-
-  const { data, error } = await supabase
-    .from("movements")
-    .select(`
-      id,
-      description,
-      operations:operation_id (
-        bills:bill_id (
-          bill_amount,
-          bill_date
-        )
-      )
-    `)
-    .eq("movement_type", "egreso")
-    .gte("operations.bills.bill_date", startDate)
-    .lte("operations.bills.bill_date", endDate)
-
-  if (error) throw error
-
-  const expenses = data.map((expense) => ({
-    id: expense.id,
-    description: expense.description,
-    amount: expense.operations?.bills?.bill_amount || 0,
-  }))
-
-  // Ordenar por monto de mayor a menor y tomar los 5 primeros
-  return expenses.sort((a, b) => b.amount - a.amount).slice(0, 5)
-}
-
-// Reemplazar la función export default con la siguiente implementación
-export default function DashboardPage() {
-  // Añadir estado para el período seleccionado
-  const [period, setPeriod] = useState<"current" | "previous">("current")
-
-  const [cumulativeData, setCumulativeData] = useState<
-    Array<{ day: string; ingresos: number; egresos: number; balance: number }>
-  >([])
-  const [expenseCategories, setExpenseCategories] = useState<Array<{ name: string; value: number }>>([])
-  const [incomeCategories, setIncomeCategories] = useState<Array<{ name: string; value: number }>>([])
-  const [topIncomes, setTopIncomes] = useState<Array<{ id: string; description: string; amount: number }>>([])
-  const [topExpenses, setTopExpenses] = useState<Array<{ id: string; description: string; amount: number }>>([])
-  const [monthlyData, setMonthlyData] = useState<
-    Array<{ month: string; ingresos: number; egresos: number; balance: number }>
-  >([])
-  const [loadingChart, setLoadingChart] = useState(true)
-  const [loadingPieCharts, setLoadingPieCharts] = useState(true)
-  const [loadingTopMovements, setLoadingTopMovements] = useState(true)
-  const [loadingMonthlyChart, setLoadingMonthlyChart] = useState(true)
-  const [showIncomes, setShowIncomes] = useState(true) // Estado para controlar qué datos mostrar
+  // Calcular todos los datos según el rango
+  const filteredMovements = filterMovementsByDate(movements, startDate, endDate)
+  const stats = calculateTotals(movements, startDate, endDate)
+  const cumulativeData = getCumulativeData(movements, startDate, endDate)
+  const expenseCategories = getExpensesByCategory(movements, startDate, endDate)
+  const incomeCategories = getIncomesByCategory(movements, startDate, endDate)
+  const topIncomes = getTopIncomes(movements, startDate, endDate)
+  const topExpenses = getTopExpenses(movements, startDate, endDate)
+  const monthlyData = getMonthlyMovements(movements, startDate, endDate)
 
   const { formatCurrency, currency, convertAmount } = useCurrency()
-
-  // Función para obtener el año y mes según el período seleccionado
-  const getSelectedYearAndMonth = () => {
-    const today = new Date()
-    if (period === "current") {
-      return {
-        year: today.getFullYear(),
-        month: today.getMonth() + 1,
-      }
-    } else {
-      // Mes anterior
-      const previousMonth = new Date(today)
-      previousMonth.setMonth(today.getMonth() - 1)
-      return {
-        year: previousMonth.getFullYear(),
-        month: previousMonth.getMonth() + 1,
-      }
-    }
-  }
-
-  // Función para obtener el nombre del mes
-  const getMonthName = (date: Date) => {
-    return date.toLocaleString("es-ES", { month: "long" })
-  }
-
-  // Obtener el nombre del mes según el período seleccionado
-  const getSelectedMonthName = () => {
-    const today = new Date()
-    if (period === "current") {
-      return getMonthName(today)
-    } else {
-      const previousMonth = new Date(today)
-      previousMonth.setMonth(today.getMonth() - 1)
-      return getMonthName(previousMonth)
-    }
-  }
-
-  useEffect(() => {
-    async function fetchDashboardData() {
-      setLoadingChart(true)
-      setLoadingPieCharts(true)
-      setLoadingTopMovements(true)
-      setLoadingMonthlyChart(true)
-      try {
-        const { year, month } = getSelectedYearAndMonth()
-
-        const data = await getCumulativeMovements(year, month)
-        const categoriesData = await getExpensesByCategory(year, month)
-        const incomesData = await getIncomesByCategory(year, month)
-        const topIncomesData = await getTopIncomesOfMonth(year, month)
-        const topExpensesData = await getTopExpensesOfMonth(year, month)
-        const monthlyMovementsData = await getMonthlyMovements(year, month)
-
-        setCumulativeData(data)
-        setExpenseCategories(categoriesData)
-        setIncomeCategories(incomesData)
-        setTopIncomes(topIncomesData)
-        setTopExpenses(topExpensesData)
-        setMonthlyData(monthlyMovementsData)
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
-      } finally {
-        setLoadingChart(false)
-        setLoadingPieCharts(false)
-        setLoadingTopMovements(false)
-        setLoadingMonthlyChart(false)
-      }
-    }
-
-    fetchDashboardData()
-  }, [period]) // Añadir period como dependencia para recargar cuando cambie
 
   // Colores para los gráficos de torta
   const EXPENSE_COLORS = ["#4F7942", "#6B9362", "#8FB283", "#A6C29F", "#C1D2BC"]
   const INCOME_COLORS = ["#2D5016", "#4F7942", "#6B9362", "#8FB283", "#A6C29F"]
 
   // Función para alternar entre ingresos y egresos
+  const [showIncomes, setShowIncomes] = useState(true)
   const toggleMovementType = () => {
-    setShowIncomes(!showIncomes)
+    setShowIncomes((prev) => !prev)
   }
-
-  // Obtener el nombre del mes seleccionado
-  const selectedMonthName = getSelectedMonthName()
-  const selectedMonthCapitalized = selectedMonthName.charAt(0).toUpperCase() + selectedMonthName.slice(1)
 
   // Función para formatear los valores del eje Y según la moneda seleccionada
   const formatYAxisTick = (value: number) => {
@@ -493,32 +373,28 @@ export default function DashboardPage() {
     <div className="p-6 bg-[#F5F6FA]">
       <h2 className="mb-6 text-3xl font-bold">Dashboard</h2>
 
-      {/* Selector de período */}
-      <div className="flex justify-end mb-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="bg-white">
-              {period === "current" ? "Mes actual" : "Mes anterior"}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setPeriod("current")}>Mes actual</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPeriod("previous")}>Mes anterior</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {/* Selector de rango de fechas */}
+      <div className="flex gap-4 mb-4 items-end">
+        <div>
+          <label className="block text-sm font-medium mb-1">Fecha inicio</label>
+          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Fecha fin</label>
+          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
       </div>
 
       {/* Componente de estadísticas con datos reales */}
-      <DashboardStats period={period} onPeriodChange={setPeriod} />
+      <DashboardStats startDate={startDate} endDate={endDate} stats={stats} loading={loadingMovements} />
 
       <div className="mt-6">
         <Card className="shadow-lg border-none col-span-full">
           <CardHeader>
-            <CardTitle>Evolución Mensual Acumulada - {selectedMonthCapitalized}</CardTitle>
+            <CardTitle>Evolución Mensual Acumulada - {getMonthRangeString(startDate, endDate)}</CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingChart ? (
+            {loadingMovements ? (
               <div className="animate-pulse h-[350px] bg-gray-200 rounded"></div>
             ) : (
               <div className="mb-4">
@@ -595,10 +471,10 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-lg border-none">
           <CardHeader>
-            <CardTitle>Distribución de Gastos por Categoría - {selectedMonthCapitalized}</CardTitle>
+            <CardTitle>Distribución de Gastos por Categoría - {getMonthRangeString(startDate, endDate)}</CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingPieCharts ? (
+            {loadingMovements ? (
               <div className="animate-pulse h-[300px] bg-gray-200 rounded"></div>
             ) : expenseCategories.length === 0 ? (
               <div className="flex items-center justify-center h-[300px] text-muted-foreground">
@@ -646,10 +522,10 @@ export default function DashboardPage() {
 
         <Card className="shadow-lg border-none">
           <CardHeader>
-            <CardTitle>Distribución de Ingresos por Categoría - {selectedMonthCapitalized}</CardTitle>
+            <CardTitle>Distribución de Ingresos por Categoría - {getMonthRangeString(startDate, endDate)}</CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingPieCharts ? (
+            {loadingMovements ? (
               <div className="animate-pulse h-[300px] bg-gray-200 rounded"></div>
             ) : incomeCategories.length === 0 ? (
               <div className="flex items-center justify-center h-[300px] text-muted-foreground">
@@ -698,7 +574,7 @@ export default function DashboardPage() {
         <Card className="shadow-lg border-none">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle>
-              {showIncomes ? "Mayores Ingresos" : "Principales Egresos"} - {selectedMonthCapitalized}
+              {showIncomes ? "Mayores Ingresos" : "Principales Egresos"} - {getMonthRangeString(startDate, endDate)}
             </CardTitle>
             <Button
               variant="ghost"
@@ -712,7 +588,7 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {loadingTopMovements ? (
+            {loadingMovements ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, index) => (
                   <div key={index} className="flex items-center justify-between animate-pulse">
@@ -724,7 +600,7 @@ export default function DashboardPage() {
             ) : showIncomes ? (
               topIncomes.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
-                  No se encontraron ingresos en {selectedMonthCapitalized}
+                  No se encontraron ingresos en {getMonthRangeString(startDate, endDate)}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -742,7 +618,7 @@ export default function DashboardPage() {
               )
             ) : topExpenses.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
-                No se encontraron egresos en {selectedMonthCapitalized}
+                No se encontraron egresos en {getMonthRangeString(startDate, endDate)}
               </div>
             ) : (
               <div className="space-y-4">
@@ -768,7 +644,7 @@ export default function DashboardPage() {
             <CardTitle>Comparativa Mensual: Ingresos vs Egresos</CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingMonthlyChart ? (
+            {loadingMovements ? (
               <div className="animate-pulse h-[450px] bg-gray-200 rounded"></div>
             ) : (
               <div className="mb-4">

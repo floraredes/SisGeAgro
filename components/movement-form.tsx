@@ -58,15 +58,10 @@ export function MovementForm({
     entityName: "",
     entityId: "",
     selectedTaxes: [],
-<<<<<<< HEAD
-    isTaxPayment: false,
-    relatedTaxId: null,
-    check: false,
-=======
     // Inicializar los nuevos campos
     isTaxPayment: false,
     relatedTaxId: null,
->>>>>>> origin/main
+    check: false,
   })
   const [billNumberError, setBillNumberError] = useState<string | null>(null)
   const [cuitCuilError, setCuitCuilError] = useState<string | null>(null)
@@ -109,15 +104,9 @@ export function MovementForm({
         entityName: existingData.empresa || "",
         entityId: existingData.entityId || "",
         selectedTaxes: existingData.taxes || [],
-<<<<<<< HEAD
         isTaxPayment: existingData.isTaxPayment || false,
         relatedTaxId: existingData.relatedTaxId || null,
         check: existingData.check || false,
-=======
-        // Cargar los campos de pago de impuestos si existen
-        isTaxPayment: existingData.isTaxPayment || false,
-        relatedTaxId: existingData.relatedTaxId || null,
->>>>>>> origin/main
       })
     }
   }, [isEditMode, existingData, open, defaultMovementType])
@@ -180,10 +169,7 @@ export function MovementForm({
       selectedTaxes: [],
       isTaxPayment: false,
       relatedTaxId: null,
-<<<<<<< HEAD
       check: false,
-=======
->>>>>>> origin/main
     })
     setBillNumberError(null)
     setCuitCuilError(null)
@@ -264,12 +250,24 @@ export function MovementForm({
 
       // Validar que se haya seleccionado una forma de pago
       if (!formData.paymentType) {
-        throw new Error("Debe seleccionar una forma de pago")
+        toast({
+          title: "Error de validación",
+          description: "Debe seleccionar una forma de pago",
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
       }
 
       // Validar que se haya ingresado un método de pago personalizado si se seleccionó "Otro"
       if (formData.paymentType === "Otro" && !formData.customPaymentType.trim()) {
-        throw new Error("Debe especificar el método de pago personalizado")
+        toast({
+          title: "Error de validación",
+          description: "Debe especificar el método de pago personalizado",
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
       }
 
       // Si es un pago de impuesto, validar que se haya seleccionado un impuesto relacionado
@@ -377,7 +375,7 @@ export function MovementForm({
         const { data: existingCategories, error: categoryFetchError } = await supabase
           .from("category")
           .select("*")
-          .eq("description", formData.category)
+          .ilike("description", formData.category.toUpperCase())
           .limit(1)
 
         if (categoryFetchError) throw categoryFetchError
@@ -387,7 +385,7 @@ export function MovementForm({
         } else {
           const { data: newCategory, error: categoryInsertError } = await supabase
             .from("category")
-            .insert([{ description: formData.category }])
+            .insert([{ description: formData.category.toUpperCase() }])
             .select()
             .single()
 
@@ -400,7 +398,7 @@ export function MovementForm({
         const { data: existingSubcategories, error: subcategoryFetchError } = await supabase
           .from("sub_category")
           .select("*")
-          .eq("description", formData.subCategory)
+          .ilike("description", formData.subCategory.toUpperCase())
           .eq("category_id", categoryData.id)
           .limit(1)
 
@@ -413,7 +411,7 @@ export function MovementForm({
             .from("sub_category")
             .insert([
               {
-                description: formData.subCategory,
+                description: formData.subCategory.toUpperCase(),
                 category_id: categoryData.id,
               },
             ])
@@ -433,10 +431,7 @@ export function MovementForm({
             sub_category_id: subcategoryData.id,
             is_tax_payment: formData.isTaxPayment,
             related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
-<<<<<<< HEAD
             check: formData.check,
-=======
->>>>>>> origin/main
           })
           .eq("id", existingData.id)
 
@@ -541,7 +536,7 @@ export function MovementForm({
         const { data: existingCategories, error: categoryFetchError } = await supabase
           .from("category")
           .select("*")
-          .eq("description", formData.category)
+          .ilike("description", formData.category.toUpperCase())
           .limit(1)
 
         if (categoryFetchError) throw categoryFetchError
@@ -553,7 +548,7 @@ export function MovementForm({
           // Category doesn't exist, create it
           const { data: newCategory, error: categoryInsertError } = await supabase
             .from("category")
-            .insert([{ description: formData.category }])
+            .insert([{ description: formData.category.toUpperCase() }])
             .select()
             .single()
 
@@ -567,7 +562,7 @@ export function MovementForm({
         const { data: existingSubcategories, error: subcategoryFetchError } = await supabase
           .from("sub_category")
           .select("*")
-          .eq("description", formData.subCategory)
+          .ilike("description", formData.subCategory.toUpperCase())
           .eq("category_id", categoryData.id)
           .limit(1)
 
@@ -582,7 +577,7 @@ export function MovementForm({
             .from("sub_category")
             .insert([
               {
-                description: formData.subCategory,
+                description: formData.subCategory.toUpperCase(),
                 category_id: categoryData.id,
               },
             ])
@@ -616,16 +611,10 @@ export function MovementForm({
               movement_type: formData.movementType,
               operation_id: operationData.id,
               sub_category_id: subcategoryData.id,
-<<<<<<< HEAD
               created_by: currentUser.id,
               is_tax_payment: formData.isTaxPayment,
               related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
               check: formData.check,
-=======
-              created_by: currentUser.id, // Usar el ID del usuario actual (UUID)
-              is_tax_payment: formData.isTaxPayment,
-              related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
->>>>>>> origin/main
             },
           ])
           .select()
@@ -983,7 +972,6 @@ export function MovementForm({
                     />
                   </div>
                 )}
-<<<<<<< HEAD
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -998,8 +986,6 @@ export function MovementForm({
                   />
                   <Label htmlFor="check">Marcar como verificado</Label>
                 </div>
-=======
->>>>>>> origin/main
               </div>
 
               <Button type="submit" className="w-full bg-[#4F7942] hover:bg-[#3F6932]" disabled={loading}>

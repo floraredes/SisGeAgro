@@ -7,72 +7,34 @@ import { supabase } from "@/lib/supabase/supabaseClient"
 // Importar el hook de moneda
 import { useCurrency } from "@/contexts/currency-context"
 
-// Función para obtener el primer y último día del mes
-function getMonthDates(year: number, month: number) {
-  const startDate = `${year}-${month.toString().padStart(2, "0")}-01`
-  const endDate = `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate()}`
-  return { startDate, endDate }
-}
 
-// Añadir props al componente
+// Cambiar la interfaz de props
 interface DashboardStatsProps {
-  period: "current" | "previous"
-  onPeriodChange?: (period: "current" | "previous") => void
+  startDate: string
+  endDate: string
 }
 
-export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) {
+export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
   // Usar el hook de moneda para formatear valores
   const { formatCurrency } = useCurrency()
 
   const [loading, setLoading] = useState(true)
+  const [movements, setMovements] = useState<any[]>([])
   const [stats, setStats] = useState({
-    currentMonth: {
-      income: 0,
-      expense: 0,
-      taxes: 0,
-    },
-    previousMonth: {
-      income: 0,
-      expense: 0,
-      taxes: 0,
-    },
-    twoMonthsAgo: {
-      income: 0,
-      expense: 0,
-      taxes: 0,
-    },
+    income: 0,
+    expense: 0,
+    taxes: 0,
   })
 
   useEffect(() => {
-    async function fetchStatsData() {
+    async function fetchMovements() {
       setLoading(true)
       try {
-        const today = new Date()
-        const currentYear = today.getFullYear()
-        const currentMonth = today.getMonth() + 1 // JavaScript months are 0-indexed
-
-        // Fechas para el mes actual
-        const { startDate: currentStartDate, endDate: currentEndDate } = getMonthDates(currentYear, currentMonth)
-
-        // Fechas para el mes anterior
-        const previousDate = new Date(today)
-        previousDate.setMonth(today.getMonth() - 1)
-        const previousYear = previousDate.getFullYear()
-        const previousMonth = previousDate.getMonth() + 1
-        const { startDate: previousStartDate, endDate: previousEndDate } = getMonthDates(previousYear, previousMonth)
-
-        // Fechas para dos meses atrás
-        const twoMonthsAgoDate = new Date(today)
-        twoMonthsAgoDate.setMonth(today.getMonth() - 2)
-        const twoMonthsAgoYear = twoMonthsAgoDate.getFullYear()
-        const twoMonthsAgoMonth = twoMonthsAgoDate.getMonth() + 1
-        const { startDate: twoMonthsAgoStartDate, endDate: twoMonthsAgoEndDate } = getMonthDates(
-          twoMonthsAgoYear,
-          twoMonthsAgoMonth,
-        )
-
-        // Obtener ingresos y egresos para el mes actual
-        const { data: currentData, error: currentError } = await supabase
+        // Traer todos los movimientos del año en curso
+        const year = new Date().getFullYear()
+        const yearStart = `${year}-01-01`
+        const yearEnd = `${year}-12-31`
+        const { data, error } = await supabase
           .from("movements")
           .select(`
             movement_type,
@@ -86,133 +48,56 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
               calculated_amount
             )
           `)
-          .gte("operations.bills.bill_date", currentStartDate)
-          .lte("operations.bills.bill_date", currentEndDate)
-
-        if (currentError) throw currentError
-
-        // Obtener ingresos y egresos para el mes anterior
-        const { data: previousData, error: previousError } = await supabase
-          .from("movements")
-          .select(`
-            movement_type,
-            operations:operation_id (
-              bills:bill_id (
-                bill_amount,
-                bill_date
-              )
-            ),
-            movement_taxes (
-              calculated_amount
-            )
-          `)
-          .gte("operations.bills.bill_date", previousStartDate)
-          .lte("operations.bills.bill_date", previousEndDate)
-
-        if (previousError) throw previousError
-
-        // Obtener ingresos y egresos para dos meses atrás
-        const { data: twoMonthsAgoData, error: twoMonthsAgoError } = await supabase
-          .from("movements")
-          .select(`
-            movement_type,
-            operations:operation_id (
-              bills:bill_id (
-                bill_amount,
-                bill_date
-              )
-            ),
-            movement_taxes (
-              calculated_amount
-            )
-          `)
-          .gte("operations.bills.bill_date", twoMonthsAgoStartDate)
-          .lte("operations.bills.bill_date", twoMonthsAgoEndDate)
-
-        if (twoMonthsAgoError) throw twoMonthsAgoError
-
-        // Calcular totales para el mes actual
-        let currentIncome = 0
-        let currentExpense = 0
-        let currentTaxes = 0
-
-        currentData?.forEach((movement) => {
-          const amount = movement.operations?.bills?.bill_amount || 0
-          const taxes = movement.movement_taxes?.reduce((sum, tax) => sum + (tax.calculated_amount || 0), 0) || 0
-
-          if (movement.movement_type === "ingreso") {
-            currentIncome += amount
-            // Para ingresos, los impuestos se restan
-            currentTaxes += taxes
-          } else if (movement.movement_type === "egreso") {
-            currentExpense += amount
-            // Para egresos, los impuestos se suman
-            currentTaxes += taxes
-          }
-        })
-
-        // Calcular totales para el mes anterior
-        let previousIncome = 0
-        let previousExpense = 0
-        let previousTaxes = 0
-
-        previousData?.forEach((movement) => {
-          const amount = movement.operations?.bills?.bill_amount || 0
-          const taxes = movement.movement_taxes?.reduce((sum, tax) => sum + (tax.calculated_amount || 0), 0) || 0
-
-          if (movement.movement_type === "ingreso") {
-            previousIncome += amount
-            previousTaxes += taxes
-          } else if (movement.movement_type === "egreso") {
-            previousExpense += amount
-            previousTaxes += taxes
-          }
-        })
-
-        // Calcular totales para dos meses atrás
-        let twoMonthsAgoIncome = 0
-        let twoMonthsAgoExpense = 0
-        let twoMonthsAgoTaxes = 0
-
-        twoMonthsAgoData?.forEach((movement) => {
-          const amount = movement.operations?.bills?.bill_amount || 0
-          const taxes = movement.movement_taxes?.reduce((sum, tax) => sum + (tax.calculated_amount || 0), 0) || 0
-
-          if (movement.movement_type === "ingreso") {
-            twoMonthsAgoIncome += amount
-            twoMonthsAgoTaxes += taxes
-          } else if (movement.movement_type === "egreso") {
-            twoMonthsAgoExpense += amount
-            twoMonthsAgoTaxes += taxes
-          }
-        })
-
-        setStats({
-          currentMonth: {
-            income: currentIncome,
-            expense: currentExpense,
-            taxes: currentTaxes,
-          },
-          previousMonth: {
-            income: previousIncome,
-            expense: previousExpense,
-            taxes: previousTaxes,
-          },
-          twoMonthsAgo: {
-            income: twoMonthsAgoIncome,
-            expense: twoMonthsAgoExpense,
-            taxes: twoMonthsAgoTaxes,
-          },
-        })
+          .gte("operations.bills.bill_date", yearStart)
+          .lte("operations.bills.bill_date", yearEnd)
+        if (error) throw error
+        setMovements(data || [])
       } catch (error) {
-        console.error("Error fetching stats data:", error)
+        console.error("Error fetching movements:", error)
       } finally {
         setLoading(false)
       }
     }
-
-    fetchStatsData()
+    fetchMovements()
   }, [])
+
+  useEffect(() => {
+    // Unificar el cálculo de totales según el rango de fechas seleccionado
+    function calculateTotals(movements: any[], start: string, end: string) {
+      let income = 0
+      let expense = 0
+      let taxes = 0
+      movements.forEach((movement) => {
+        // Iterar sobre operaciones y bills
+        let bills: any[] = []
+        if (Array.isArray(movement.operations)) {
+          movement.operations.forEach((op: any) => {
+            if (Array.isArray(op.bills)) {
+              bills = bills.concat(op.bills)
+            }
+          })
+        } else if ((movement.operations as any)?.bills) {
+          bills = Array.isArray((movement.operations as any).bills) ? (movement.operations as any).bills : [(movement.operations as any).bills]
+        }
+        // Tomar el primer bill válido dentro del rango
+        const bill = bills.find(b => b.bill_date && b.bill_date >= start && b.bill_date <= end)
+        if (!bill) return
+        const amount = bill.bill_amount || 0
+        const taxesAmount = movement.movement_taxes?.reduce((sum: any, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0
+        if (movement.movement_type === "ingreso") {
+          income += amount
+          taxes += taxesAmount
+        } else if (movement.movement_type === "egreso") {
+          expense += amount
+          taxes += taxesAmount
+        }
+      })
+      return { income, expense, taxes }
+    }
+    if (startDate && endDate) {
+      setStats(calculateTotals(movements, startDate, endDate))
+    }
+  }, [movements, startDate, endDate])
 
   // Función para calcular el porcentaje de cambio
   const calculatePercentageChange = (current: number, previous: number) => {
@@ -221,13 +106,16 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
   }
 
   // Obtener los datos según el período seleccionado
-  const currentData = period === "current" ? stats.currentMonth : stats.previousMonth
-  const previousData = period === "current" ? stats.previousMonth : stats.twoMonthsAgo
+  const currentData = {
+    income: stats.income,
+    expense: stats.expense,
+    taxes: stats.taxes,
+  }
 
   // Calcular porcentajes de cambio
-  const incomePercentageChange = calculatePercentageChange(currentData.income, previousData.income)
-  const expensePercentageChange = calculatePercentageChange(currentData.expense, previousData.expense)
-  const taxesPercentageChange = calculatePercentageChange(currentData.taxes, previousData.taxes)
+  const incomePercentageChange = calculatePercentageChange(currentData.income, 0)
+  const expensePercentageChange = calculatePercentageChange(currentData.expense, 0)
+  const taxesPercentageChange = calculatePercentageChange(currentData.taxes, 0)
 
   // Función para obtener el nombre del mes
   const getMonthName = (offset = 0) => {
@@ -237,8 +125,7 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
   }
 
   // Obtener el nombre del mes según el período seleccionado
-  const currentMonthName = period === "current" ? getMonthName() : getMonthName(1)
-  const previousMonthName = period === "current" ? getMonthName(1) : getMonthName(2)
+  const currentMonthName = getMonthName()
 
   // Calcular el balance
   const balance = currentData.income - currentData.expense
@@ -272,9 +159,6 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
                   }`}
                 >
                   {incomePercentageChange.toFixed(1)}%
-                </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  vs. {previousMonthName.charAt(0).toUpperCase() + previousMonthName.slice(1)}
                 </span>
               </div>
             </>
@@ -311,9 +195,6 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
                 >
                   {expensePercentageChange.toFixed(1)}%
                 </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  vs. {previousMonthName.charAt(0).toUpperCase() + previousMonthName.slice(1)}
-                </span>
               </div>
             </>
           )}
@@ -348,9 +229,6 @@ export function DashboardStats({ period, onPeriodChange }: DashboardStatsProps) 
                   }`}
                 >
                   {taxesPercentageChange.toFixed(1)}%
-                </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  vs. {previousMonthName.charAt(0).toUpperCase() + previousMonthName.slice(1)}
                 </span>
               </div>
             </>

@@ -24,6 +24,7 @@ import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { useToast } from "@/components/ui/simple-toast"
 // Importar el hook useCurrency
 import { useCurrency } from "@/contexts/currency-context"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Definición de tipos
 interface Transaction {
@@ -41,10 +42,12 @@ interface Transaction {
   categoryId?: string
   subcategoryId?: string
   entityId?: string
+  check: boolean
 }
 
 // Definición de columnas disponibles
 const ALL_COLUMNS = [
+  { id: "check", label: "VERIFICADO" },
   { id: "detalle", label: "DETALLE" },
   { id: "empresa", label: "EMPRESA" },
   { id: "formaPago", label: "FORMA DE PAGO" },
@@ -263,6 +266,7 @@ export function TransactionsTable({
         operation_id,
         sub_category_id,
         created_by,
+        check,
         operations:operation_id (
           id,
           payment_id,
@@ -339,6 +343,7 @@ export function TransactionsTable({
             categoryId: item.sub_categories?.category_id,
             subcategoryId: item.sub_category_id,
             entityId: item.operations?.bills?.entity_id,
+            check: item.check || false,
           }
         }) || []
 
@@ -652,6 +657,9 @@ export function TransactionsTable({
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
+                {visibleColumns.includes("check") && (
+                  <th className="h-10 px-4 text-center align-middle font-medium whitespace-nowrap">VERIFICADO</th>
+                )}
                 {visibleColumns.includes("detalle") && (
                   <th className="h-10 px-4 text-left align-middle font-medium whitespace-nowrap">DETALLE</th>
                 )}
@@ -728,6 +736,44 @@ export function TransactionsTable({
                     className="border-b hover:bg-muted/50 cursor-context-menu"
                     onContextMenu={(e) => handleContextMenu(e, transaction)}
                   >
+                    {visibleColumns.includes("check") && (
+                      <td className="p-4 text-center">
+                        <Checkbox
+                          checked={transaction.check}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              const { error } = await supabase
+                                .from("movements")
+                                .update({ check: checked })
+                                .eq("id", transaction.id)
+                              
+                              if (error) throw error
+                              
+                              // Actualizar el estado local
+                              setTransactions((prev) =>
+                                prev.map((t) =>
+                                  t.id === transaction.id ? { ...t, check: checked as boolean } : t
+                                )
+                              )
+                              
+                              // Actualizar también en allTransactions
+                              setAllTransactions((prev) =>
+                                prev.map((t) =>
+                                  t.id === transaction.id ? { ...t, check: checked as boolean } : t
+                                )
+                              )
+                            } catch (error) {
+                              console.error("Error al actualizar el estado del check:", error)
+                              toast({
+                                title: "Error",
+                                description: "No se pudo actualizar el estado de verificación",
+                                variant: "destructive",
+                              })
+                            }
+                          }}
+                        />
+                      </td>
+                    )}
                     {visibleColumns.includes("detalle") && <td className="p-4 truncate">{transaction.detalle}</td>}
                     {visibleColumns.includes("empresa") && <td className="p-4 truncate">{transaction.empresa}</td>}
                     {visibleColumns.includes("formaPago") && <td className="p-4 truncate">{transaction.formaPago}</td>}

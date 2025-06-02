@@ -70,20 +70,12 @@ export function UserManagementSettings() {
 
       // Verificar si el usuario actual existe en la tabla users
       let { data: currentProfile, error: currentProfileError } = await supabase
-<<<<<<< HEAD
         .from("profiles")
-=======
-        .from("users")
->>>>>>> origin/main
         .select("role")
         .eq("id", currentUser?.id)
         .single()
 
-<<<<<<< HEAD
       /*// Si el usuario no existe en la tabla users, crearlo automáticamente como admin
-=======
-      // Si el usuario no existe en la tabla users, crearlo automáticamente como admin
->>>>>>> origin/main
       if (currentProfileError && currentProfileError.code === "PGRST116") {
         // El usuario no existe en la tabla users, crearlo
         const { data: newProfile, error: insertError } = await supabase
@@ -105,11 +97,7 @@ export function UserManagementSettings() {
       } else if (currentProfileError) {
         throw currentProfileError
       }
-<<<<<<< HEAD
       */
-=======
-
->>>>>>> origin/main
       // Si no es admin, mostrar mensaje y terminar
       if (currentProfile?.role !== "admin") {
         toast({
@@ -152,7 +140,6 @@ export function UserManagementSettings() {
   }
 
   // Reemplazar la función handleAddUser con esta versión mejorada
-<<<<<<< HEAD
 const handleAddUser = async (e: React.FormEvent) => {
   e.preventDefault()
 
@@ -184,31 +171,10 @@ const handleAddUser = async (e: React.FormEvent) => {
           description: "No se pudo verificar tu identidad. Por favor, inicia sesión nuevamente.",
           type: "error",
         })
-=======
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    try {
-      // Verificar la sesión actual y refrescarla si es necesario
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        throw sessionError
-      }
-
-      if (!sessionData.session) {
-        toast({
-          title: "Sesión expirada",
-          description: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
-          type: "error",
-        })
-        // Redirigir al login
->>>>>>> origin/main
         window.location.href = "/auth"
         return
       }
 
-<<<<<<< HEAD
       const {
         data: { user },
         error,
@@ -295,140 +261,6 @@ const handleAddUser = async (e: React.FormEvent) => {
   }
 }
 
-=======
-      // Obtener el usuario actual
-      const {
-        data: { user: currentUser },
-        error: currentUserError,
-      } = await supabase.auth.getUser()
-
-      if (currentUserError) {
-        // Si hay un error al obtener el usuario, intentar refrescar la sesión
-        const { error: refreshError } = await supabase.auth.refreshSession()
-        if (refreshError) {
-          toast({
-            title: "Error de autenticación",
-            description: "No se pudo verificar tu identidad. Por favor, inicia sesión nuevamente.",
-            type: "error",
-          })
-          // Redirigir al login
-          window.location.href = "/auth"
-          return
-        }
-
-        // Intentar obtener el usuario nuevamente
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser()
-        if (error || !user) {
-          throw error || new Error("No se pudo obtener la información del usuario")
-        }
-      }
-
-      if (!currentUser) {
-        toast({
-          title: "No autenticado",
-          description: "Debes iniciar sesión para realizar esta acción.",
-          type: "error",
-        })
-        // Redirigir al login
-        window.location.href = "/auth"
-        return
-      }
-
-      // Primero verificar si el usuario actual existe en la tabla users
-      let { data: currentProfile, error: currentProfileError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", currentUser?.id)
-        .single()
-
-      // Si el usuario no existe en la tabla users, crearlo automáticamente como admin
-      if (currentProfileError && currentProfileError.code === "PGRST116") {
-        // El usuario no existe en la tabla users, crearlo
-        const { data: newProfile, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: currentUser?.id,
-            username: currentUser?.email?.split("@")[0] || "admin",
-            email: currentUser?.email,
-            role: "admin", // El primer usuario será admin
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        currentProfile = newProfile
-      } else if (currentProfileError) {
-        throw currentProfileError
-      }
-
-      // Si no es admin, mostrar mensaje y terminar
-      if (currentProfile?.role !== "admin") {
-        toast({
-          title: "Acceso restringido",
-          description: "Solo los administradores pueden crear usuarios",
-          type: "error",
-        })
-        return
-      }
-
-      // Crear usuario usando la API pública de Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-      })
-
-      if (authError) {
-        throw authError
-      }
-
-      if (authData.user) {
-        // Crear perfil para el usuario
-        const { error: profileError } = await supabase.from("users").insert({
-          id: authData.user.id,
-          username: newUser.username,
-          role: newUser.role,
-          email: newUser.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        if (profileError) {
-          throw profileError
-        }
-
-        toast({
-          title: "Usuario creado",
-          description: "El usuario ha sido creado exitosamente",
-        })
-
-        // Resetear formulario y cerrar diálogo
-        setNewUser({
-          email: "",
-          username: "",
-          password: "",
-          role: "user",
-        })
-        setIsAddUserOpen(false)
-
-        // Recargar usuarios
-        loadUsers()
-      }
-    } catch (error: any) {
-      console.error("Error creating user:", error)
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el usuario",
-        type: "error",
-      })
-    }
-  }
->>>>>>> origin/main
 
   // Reemplazar la función handleEditUser con esta versión
   const handleEditUser = async (e: React.FormEvent) => {
