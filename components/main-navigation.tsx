@@ -23,7 +23,7 @@ export function MainNavigation() {
         title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente",
       })
-      router.push("/auth")
+      router.push("/")
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
       toast({

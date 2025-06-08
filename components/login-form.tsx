@@ -48,20 +48,14 @@ export default function LoginForm() {
     setError(null)
 
     if (!validateEmail(email)) {
-      setError("Por favor, ingresa un email válido")
-      toast({
-        title: "Error",
-        description: "Por favor, ingresa un email válido",
-        type: "error",
-      })
+      toast({ title: "Error", description: "Email inválido", type: "error" })
       return
     }
 
     if (!email || !password) {
-      setError("Por favor, completa todos los campos")
       toast({
         title: "Error",
-        description: "Por favor, completa todos los campos",
+        description: "Todos los campos son obligatorios",
         type: "error",
       })
       return
@@ -69,85 +63,71 @@ export default function LoginForm() {
 
     try {
       setIsLoading(true)
-      console.log("Intentando iniciar sesión con email:", email)
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data: userRecords, error: userError } = await supabase
+        .from("users")
+        .select("id, email, role, type")
+        .eq("email", email)
+
+      if (userError || !userRecords || userRecords.length === 0) {
+        toast({
+          title: "Usuario no encontrado",
+          description: "Este correo no está registrado",
+          type: "error",
+        })
+        return
+      }
+
+      const user = userRecords[0]
+
+      if (user.type === "local") {
+        // Guardar sesión en localStorage
+        localStorage.setItem("user_id", user.id)
+
+        toast({
+          title: "Inicio de sesión interno",
+          description: `Bienvenido/a, ${user.email}`,
+        })
+
+        if (user.role === "admin") {
+          router.push("/dashboard")
+        } else {
+          router.push("/user-movement")
+        }
+
+        return
+      }
+
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        console.error("Error de Supabase durante el login:", error)
+      if (authError) {
+        const message = authError.message.includes("Email not confirmed")
+          ? "Tu email no ha sido confirmado. Contactá al administrador."
+          : "Email o contraseña incorrectos."
 
-        if (error.message.includes("Invalid login credentials")) {
-          setError("Email o contraseña incorrectos. Por favor, verifica tus datos.")
-          toast({
-            title: "Error de autenticación",
-            description: "Email o contraseña incorrectos. Por favor, verifica tus datos.",
-            type: "error",
-          })
-          return
-        }
-
-        if (error.message.includes("Email not confirmed")) {
-          setError("Tu email no ha sido confirmado. Por favor, contacta al administrador.")
-          toast({
-            title: "Email no confirmado",
-            description: "Tu email no ha sido confirmado. Por favor, contacta al administrador.",
-            type: "error",
-          })
-          return
-        }
-
-        throw error
+        toast({
+          title: "Error de autenticación",
+          description: message,
+          type: "error",
+        })
+        return
       }
 
-      console.log("Login exitoso, datos devueltos:", data)
+      toast({ title: "Inicio de sesión exitoso", description: `Bienvenido/a` })
 
-      // Verificar si el usuario tiene un perfil, si no, crearlo
-      if (data && data.user) {
-        // Primero verificamos si ya existe un perfil
-        const { data: profileData, error: profileCheckError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single()
-
-        if (profileCheckError && profileCheckError.code !== "PGRST116") {
-          // PGRST116 es el código para "no se encontró ningún registro"
-          console.error("Error al verificar el perfil:", profileCheckError)
-        }
-
-        // Si no existe un perfil, lo creamos
-        if (!profileData) {
-          const { error: profileCreateError } = await supabase.from("profiles").insert([
-            {
-              id: data.user.id,
-              email: email,
-              created_at: new Date().toISOString(),
-            },
-          ])
-
-          if (profileCreateError) {
-            console.error("Error al crear el perfil del usuario:", profileCreateError)
-            // No lanzamos error aquí para permitir que el usuario inicie sesión de todos modos
-          }
-        }
+      if (user.role === "admin") {
+        router.push("/dashboard")
+      } else {
+        router.push("/user-movement")
       }
-
+    } catch (err: any) {
+      console.error("Error general en login:", err)
       toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido de nuevo",
-      })
-
-      // Asegurarse de que la redirección sea a /dashboard
-      router.push("/dashboard")
-    } catch (error: any) {
-      console.error("Error completo durante el login:", error)
-      setError(error.message || "Ocurrió un error al iniciar sesión")
-      toast({
-        title: "Error al iniciar sesión",
-        description: error.message || "Ocurrió un error al iniciar sesión",
+        title: "Error",
+        description: err.message || "Error desconocido",
         type: "error",
       })
     } finally {

@@ -3,47 +3,51 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import LoginForm from "@/components/login-form"
 
-export default function Page() {
+export default function HomePage() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
+  const [checkingSession, setCheckingSession] = useState(true)
 
   useEffect(() => {
-    // Función para verificar la sesión
-    const checkSession = async () => {
+    const checkSessionAndRedirect = async () => {
       try {
-        // Obtener la sesión actual
-        const { data, error } = await supabase.auth.getSession()
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
-        if (error) {
-          console.error("Error checking session:", error)
+        if (sessionError || !sessionData.session) {
+          setCheckingSession(false)
+          return
+        }
+
+        const userId = sessionData.session.user.id
+
+        const { data: userProfile, error: userError } = await supabase
+          .from("users")
+          .select("id, role")
+          .eq("id", userId)
+          .single()
+
+        if (userError || !userProfile) {
+          await supabase.auth.signOut()
           router.push("/auth")
           return
         }
 
-        // Verificar si hay una sesión activa
-        if (!data.session) {
-          console.log("No session found, redirecting to auth")
-          router.push("/auth")
-        } else {
-          console.log("Session found, redirecting to dashboard")
+        if (userProfile.role === "admin") {
           router.push("/dashboard")
+        } else {
+          router.push("/user-movement")
         }
       } catch (error) {
-        console.error("Exception during authentication check:", error)
+        console.error("Error verificando sesión:", error)
         router.push("/auth")
-      } finally {
-        // Establecer isLoading a false después de completar la verificación
-        setIsLoading(false)
       }
     }
 
-    // Ejecutar la verificación de sesión
-    checkSession()
+    checkSessionAndRedirect()
   }, [router])
 
-  // Mostrar un indicador de carga mientras se verifica la sesión
-  if (isLoading) {
+  if (checkingSession) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -54,7 +58,11 @@ export default function Page() {
     )
   }
 
-  // Este contenido normalmente no se mostrará porque habrá una redirección
-  return null
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#e6eee0]">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+        <LoginForm />
+      </div>
+    </div>
+  )
 }
-

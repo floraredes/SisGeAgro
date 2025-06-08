@@ -13,7 +13,6 @@ import { MainNavigation } from "@/components/main-navigation"
 import { CurrencyProvider } from "@/contexts/currency-context"
 import { CurrencySelector } from "@/components/currency-selector"
 
-// Modificar el componente DashboardLayout para incluir el CurrencyProvider
 export default function DashboardLayout({
   children,
 }: {
@@ -29,37 +28,30 @@ export default function DashboardLayout({
         setLoading(true)
         const { data, error } = await supabase.auth.getSession()
 
-        if (error) {
-          console.error("Error during authentication check:", error)
+        if (error || !data.session) {
+          console.error("Error durante autenticación:", error)
           router.push("/auth")
           return
         }
 
-        if (!data.session) {
-          console.log("No session found in dashboard layout, redirecting to auth")
-          router.push("/auth")
-          return
+        const user = data.session.user
+
+        // Obtener el nombre desde la tabla unificada `users`
+        const { data: userProfile, error: profileError } = await supabase
+          .from("users")
+          .select("username")
+          .eq("id", user.id)
+          .single()
+
+        if (profileError) {
+          console.error("Error al obtener perfil del usuario:", profileError)
         }
 
-        // Obtener el nombre de usuario si hay sesión
-        if (data.session?.user) {
-          try {
-            // Intentar obtener el nombre del perfil
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("username")
-              .eq("id", data.session.user.id)
-              .single()
+        const displayName = userProfile?.username || user.email?.split("@")[0] || "Usuario"
+        setUserName(displayName)
 
-            // Usar el username del perfil o el email como fallback
-            const displayName = profile?.username || data.session.user.email?.split("@")[0] || "Usuario"
-            setUserName(displayName)
-          } catch (profileError) {
-            console.error("Error fetching user profile:", profileError)
-          }
-        }
       } catch (error) {
-        console.error("Exception during authentication check:", error)
+        console.error("Excepción al verificar autenticación:", error)
         router.push("/auth")
       } finally {
         setLoading(false)

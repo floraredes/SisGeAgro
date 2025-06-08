@@ -26,8 +26,10 @@ interface MovementFormProps {
   onOpenChange: (open: boolean) => void
   defaultMovementType?: "ingreso" | "egreso" | "inversión"
   isEditMode?: boolean
-  existingData?: any // Datos del movimiento existente para editar
-  onSuccess?: () => void // Callback para cuando se completa la operación
+  existingData?: any
+  onSuccess?: () => void
+  user?: any
+  hideCheckField?: boolean
 }
 
 export function MovementForm({
@@ -37,6 +39,8 @@ export function MovementForm({
   isEditMode = false,
   existingData = null,
   onSuccess,
+  user,
+  hideCheckField = false,
 }: MovementFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -72,9 +76,14 @@ export function MovementForm({
   useEffect(() => {
     if (open) {
       fetchTaxes()
-      getCurrentUser()
+      // Si viene user por prop, usarlo como currentUser
+      if (user) {
+        setCurrentUser(user)
+      } else {
+        getCurrentUser()
+      }
     }
-  }, [open])
+  }, [open, user])
 
   // Cargar datos existentes si estamos en modo edición
   useEffect(() => {
@@ -195,7 +204,10 @@ export function MovementForm({
     setBillNumberError(null)
 
     try {
-      // Verificar que el usuario esté autenticado
+      // DEBUG: Verificar currentUser antes de la validación
+      console.log("DEBUG currentUser en handleSubmit:", currentUser)
+
+      // Verificar que el usuario esté autenticado o sea local
       if (!currentUser || !currentUser.id) {
         throw new Error("Debe iniciar sesión para realizar esta acción")
       }
@@ -611,7 +623,7 @@ export function MovementForm({
               movement_type: formData.movementType,
               operation_id: operationData.id,
               sub_category_id: subcategoryData.id,
-              created_by: currentUser.id,
+              created_by: currentUser.id, // Esto funciona para ambos tipos
               is_tax_payment: formData.isTaxPayment,
               related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
               check: formData.check,
@@ -687,10 +699,23 @@ export function MovementForm({
         }
       }}
     >
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent
+        className={`max-w-4xl max-h-[90vh] ${user?.type === "local" ? "hide-close" : ""}`}
+      >
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar movimiento" : "Ingresar datos"}</DialogTitle>
           <DialogDescription>Complete los campos para ingresar un nuevo registro.</DialogDescription>
+          {/* Solo mostrar el botón de cerrar si el usuario NO es local */}
+          {user?.type !== "local" && (
+            <button
+              type="button"
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+              onClick={() => onOpenChange(false)}
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          )}
         </DialogHeader>
 
         <ScrollArea className="pr-4 max-h-[calc(90vh-120px)]">
@@ -973,6 +998,7 @@ export function MovementForm({
                   </div>
                 )}
 
+              {!hideCheckField && (
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="check"
@@ -986,6 +1012,7 @@ export function MovementForm({
                   />
                   <Label htmlFor="check">Marcar como verificado</Label>
                 </div>
+              )}
               </div>
 
               <Button type="submit" className="w-full bg-[#4F7942] hover:bg-[#3F6932]" disabled={loading}>

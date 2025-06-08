@@ -70,35 +70,10 @@ export function UserManagementSettings() {
 
       // Verificar si el usuario actual existe en la tabla users
       let { data: currentProfile, error: currentProfileError } = await supabase
-        .from("profiles")
-        .select("role")
+        .from("users")
+        .select("role, type")
         .eq("id", currentUser?.id)
-        .single()
 
-      /*// Si el usuario no existe en la tabla users, crearlo automáticamente como admin
-      if (currentProfileError && currentProfileError.code === "PGRST116") {
-        // El usuario no existe en la tabla users, crearlo
-        const { data: newProfile, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: currentUser?.id,
-            username: currentUser?.email?.split("@")[0] || "admin",
-            email: currentUser?.email,
-            role: "admin", // El primer usuario será admin
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        currentProfile = newProfile
-      } else if (currentProfileError) {
-        throw currentProfileError
-      }
-      */
-      // Si no es admin, mostrar mensaje y terminar
       if (currentProfile?.role !== "admin") {
         toast({
           title: "Acceso restringido",

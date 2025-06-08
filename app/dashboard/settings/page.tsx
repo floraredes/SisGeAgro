@@ -34,9 +34,9 @@ export default function SettingsPage() {
           return
         }
 
-        // Obtener el perfil del usuario desde la tabla profiles
+        // Obtener el perfil del usuario desde la tabla users
         const { data: profile, error: profileError } = await supabase
-          .from("profiles")
+          .from("users")
           .select("*")
           .eq("id", session.user.id)
           .single()
@@ -49,11 +49,6 @@ export default function SettingsPage() {
 
         setUserProfile(profile)
 
-        // Verificar si el usuario es admin (opcional - puedes comentar esta verificación si quieres que todos accedan)
-        // if (profile.role !== 'admin') {
-        //   setError("No tienes permisos para acceder a esta página")
-        //   return
-        // }
       } catch (error) {
         console.error("Error checking user access:", error)
         setError("Error al verificar el acceso del usuario")

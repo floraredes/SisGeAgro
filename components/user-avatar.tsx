@@ -53,7 +53,7 @@ export function UserAvatar() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
-      router.push("/auth")
+      router.push("/")
     } catch (error) {
       console.error("Error during logout:", error)
     }
