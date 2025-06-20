@@ -30,34 +30,20 @@ export function TaxDialog({ open, onOpenChange, onTaxCreated }: TaxDialogProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
     try {
-      // Validaciones básicas
-      if (!formData.name.trim()) {
-        throw new Error("El nombre del impuesto es obligatorio")
-      }
-
-      // Solo validar el porcentaje si hasPercentage es true
+      if (!formData.name.trim()) throw new Error("El nombre del impuesto es obligatorio")
       if (formData.hasPercentage) {
         if (formData.percentage <= 0 || formData.percentage > 100) {
           throw new Error("El porcentaje debe ser mayor que 0 y menor o igual a 100")
         }
       }
 
-      const { error } = await supabase.from("taxes").insert([
-        {
-          name: formData.name,
-          percentage: formData.hasPercentage ? formData.percentage : null,
-        },
-      ])
+      await onTaxCreated(
+        formData.name,
+        formData.hasPercentage ? formData.percentage : null
+      )
 
-      if (error) throw error
-
-      // Llamar a la función de callback para notificar que se creó el impuesto
-      onTaxCreated()
-
-      // Resetear el formulario
-      setFormData({ name: "", percentage: 0, hasPercentage: true })
+    setFormData({ name: "", percentage: 0, hasPercentage: true })
     } catch (error: any) {
       console.error("Error al crear impuesto:", error)
       toast({

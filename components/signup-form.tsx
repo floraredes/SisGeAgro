@@ -90,7 +90,6 @@ export default function SignupForm({ onLogin }: SignupFormProps) {
       setIsLoading(true)
 
       // Registrar usuario en Supabase
-      console.log("Intentando registrar usuario con email:", email)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -106,7 +105,6 @@ export default function SignupForm({ onLogin }: SignupFormProps) {
         throw error
       }
 
-      console.log("Registro exitoso, datos devueltos:", data)
 
       // Verificar si el usuario se creó correctamente
       if (data && data.user) {

@@ -19,14 +19,17 @@ interface EntitySelectorProps {
   onOpenChange: (open: boolean) => void
   onSelectEntity: (entity: Entity) => void
   onCreateNewEntity: () => void
+  user: any
 }
 
-export function EntitySelector({ open, onOpenChange, onSelectEntity, onCreateNewEntity }: EntitySelectorProps) {
+export function EntitySelector({ open, onOpenChange, onSelectEntity, onCreateNewEntity, user }: EntitySelectorProps) {
   const [entities, setEntities] = useState<Entity[]>([])
   const [filteredEntities, setFilteredEntities] = useState<Entity[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const isAdmin = user?.role === "admin"
+  const isInternal = user?.type === "local"
 
   // Cargar entidades al abrir el modal
   useEffect(() => {
@@ -51,18 +54,25 @@ export function EntitySelector({ open, onOpenChange, onSelectEntity, onCreateNew
   const fetchEntities = async () => {
     setLoading(true)
     setError(null)
-    try {
-      const { data, error } = await supabase.from("entity").select("id, nombre, cuit_cuil").order("nombre")
-
-      if (error) throw error
-
-      setEntities(data || [])
-      setFilteredEntities(data || [])
-    } catch (error: any) {
-      console.error("Error fetching entities:", error)
-      setError("No se pudieron cargar las entidades")
+    try { 
+      let data;
+      if (isInternal) {
+        // Usuarios internos: fetch a tu API
+        const res = await fetch('/api/entities');
+        const json = await res.json();
+        data = json.entities || [];
+        setEntities(json.entities || []);
+      } else {
+        // Admins: directo a Supabase
+        const { data: supaData, error } = await supabase.from("entity").select("*");
+        if (error) throw error;
+        data = supaData || []
+    }
+    setEntities(data || []);
+    }catch (err: any) {
+    setError(err.message || "Error al cargar entidades");
     } finally {
-      setLoading(false)
+    setLoading(false);
     }
   }
 

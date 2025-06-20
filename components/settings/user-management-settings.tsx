@@ -74,7 +74,7 @@ export function UserManagementSettings() {
         .select("role, type")
         .eq("id", currentUser?.id)
 
-      if (currentProfile?.role !== "admin") {
+      if (!currentProfile || currentProfile.length === 0 || currentProfile[0].role !== "admin") {
         toast({
           title: "Acceso restringido",
           description: "Solo los administradores pueden gestionar usuarios",

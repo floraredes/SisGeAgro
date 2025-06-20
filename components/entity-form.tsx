@@ -19,7 +19,7 @@ interface Entity {
 interface EntityFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onEntityCreated: (entity: Entity) => void
+  onEntityCreated: (nombre: string, cuit_cuil: string) => Promise<void>
 }
 
 export function EntityForm({ open, onOpenChange, onEntityCreated }: EntityFormProps) {
@@ -58,42 +58,7 @@ export function EntityForm({ open, onOpenChange, onEntityCreated }: EntityFormPr
         return
       }
 
-      // Verificar si ya existe una entidad con ese CUIT/CUIL
-      const { data: existingEntity, error: checkError } = await supabase
-        .from("entity")
-        .select("*")
-        .eq("cuit_cuil", entityCuitCuil)
-        .maybeSingle()
-
-      if (checkError) throw checkError
-
-      if (existingEntity) {
-        // En lugar de mostrar un error, informamos al usuario que la entidad ya existe
-        // y la seleccionamos automáticamente
-        toast({
-          title: "Entidad existente",
-          description: "Ya existe una entidad con ese CUIT/CUIL. Se ha seleccionado automáticamente.",
-          type: "info",
-        })
-
-        // Notificar al componente padre con la entidad existente
-        onEntityCreated(existingEntity)
-        return
-      }
-
-      // Crear la entidad
-      const { data, error } = await supabase
-        .from("entity")
-        .insert([
-          {
-            nombre: entityName,
-            cuit_cuil: entityCuitCuil,
-          },
-        ])
-        .select()
-        .single()
-
-      if (error) throw error
+      await onEntityCreated(entityName, entityCuitCuil)
 
       toast({
         title: "Entidad creada",
@@ -101,12 +66,9 @@ export function EntityForm({ open, onOpenChange, onEntityCreated }: EntityFormPr
         type: "success",
       })
 
-      // Notificar al componente padre
-      onEntityCreated(data)
-
-      // Limpiar el formulario
       setEntityName("")
       setEntityCuitCuil("")
+      onOpenChange(false)
     } catch (error: any) {
       console.error("Error creating entity:", error)
       toast({
