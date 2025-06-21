@@ -118,7 +118,7 @@ export default function IngresosPage() {
   }
 
   return (
-    <div className="p-6 bg-[#F5F6FA] w-full">
+    <>
       <h2 className="mb-6 text-3xl font-bold">Ingresos</h2>
 
       <div className="mt-6">
@@ -217,6 +217,6 @@ export default function IngresosPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   )
 }

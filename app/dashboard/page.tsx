@@ -370,16 +370,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 bg-[#F5F6FA]">
-      <h2 className="mb-6 text-3xl font-bold">Dashboard</h2>
+    <div className="p-6 bg-[#F5F6FA] min-w-0 flex flex-col">
+      <h2 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">Dashboard</h2>
 
       {/* Selector de rango de fechas */}
-      <div className="flex gap-4 mb-4 items-end">
-        <div>
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4 items-start sm:items-end">
+        <div className="w-full sm:w-auto">
           <label className="block text-sm font-medium mb-1">Fecha inicio</label>
           <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
         </div>
-        <div>
+        <div className="w-full sm:w-auto">
           <label className="block text-sm font-medium mb-1">Fecha fin</label>
           <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
@@ -388,7 +388,7 @@ export default function DashboardPage() {
       {/* Componente de estadísticas con datos reales */}
       <DashboardStats startDate={startDate} endDate={endDate} stats={stats} loading={loadingMovements} />
 
-      <div className="mt-6">
+      <div className="mt-4 sm:mt-6">
         <Card className="shadow-lg border-none col-span-full">
           <CardHeader>
             <CardTitle>Evolución Mensual Acumulada - {getMonthRangeString(startDate, endDate)}</CardTitle>
@@ -468,7 +468,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-lg border-none">
           <CardHeader>
             <CardTitle>Distribución de Gastos por Categoría - {getMonthRangeString(startDate, endDate)}</CardTitle>
@@ -495,15 +495,16 @@ export default function DashboardPage() {
                       label={(entry) => entry.name}
                     >
                       {expenseCategories.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
-                      ))}
+    <Cell key={`expense-${entry.name}-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
+))}
                     </Pie>
                     <Tooltip formatter={(value) => formatTooltipValue(Number(value))} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  {/* Leyenda de categorías de gastos */}
                   {expenseCategories.map((category, index) => (
-                    <div key={index} className="flex items-center">
+                    <div key={category.name || index} className="flex items-center">
                       <div
                         className="w-3 h-3 mr-2 rounded-full"
                         style={{ backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length] }}
@@ -546,15 +547,16 @@ export default function DashboardPage() {
                       label={(entry) => entry.name}
                     >
                       {incomeCategories.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={INCOME_COLORS[index % INCOME_COLORS.length]} />
-                      ))}
+    <Cell key={`income-${entry.name}-${index}`} fill={INCOME_COLORS[index % INCOME_COLORS.length]} />
+))}
                     </Pie>
                     <Tooltip formatter={(value) => formatTooltipValue(Number(value))} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  {/* Leyenda de categorías de ingresos */}
                   {incomeCategories.map((category, index) => (
-                    <div key={index} className="flex items-center">
+                    <div key={category.name || index} className="flex items-center">
                       <div
                         className="w-3 h-3 mr-2 rounded-full"
                         style={{ backgroundColor: INCOME_COLORS[index % INCOME_COLORS.length] }}
@@ -604,8 +606,9 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Top ingresos */}
                   {topIncomes.map((income, index) => (
-                    <div key={income.id} className="flex items-center justify-between">
+                    <div key={income.id || index} className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="font-medium truncate max-w-[200px]">
                           {index + 1}. {income.description}
@@ -622,8 +625,9 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Top egresos */}
                 {topExpenses.map((expense, index) => (
-                  <div key={expense.id} className="flex items-center justify-between">
+                  <div key={expense.id || index} className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="font-medium truncate max-w-[200px]">
                         {index + 1}. {expense.description}
@@ -638,7 +642,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4 sm:mt-6">
         <Card className="shadow-lg border-none">
           <CardHeader>
             <CardTitle>Comparativa Mensual: Ingresos vs Egresos</CardTitle>
@@ -676,9 +680,21 @@ export default function DashboardPage() {
                       labelFormatter={(label) => `Mes: ${label}`}
                     />
                     <Legend verticalAlign="bottom" height={50} wrapperStyle={{ paddingTop: 0, bottom: 0 }} />
-                    <Bar dataKey="ingresos" name="Ingresos" fill="#4ade80" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="egresos" name="Egresos" fill="#f87171" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="balance" name="Balance" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="ingresos" name="Ingresos" fill="#4ade80" radius={[4, 4, 0, 0]}>
+                      {monthlyData.map((entry, index) => (
+    <Cell key={`ingresos-${entry.monthKey}-${index}`} />
+  ))}
+</Bar>
+<Bar dataKey="egresos" name="Egresos" fill="#f87171" radius={[4, 4, 0, 0]}>
+  {monthlyData.map((entry, index) => (
+    <Cell key={`egresos-${entry.monthKey}-${index}`} />
+  ))}
+</Bar>
+<Bar dataKey="balance" name="Balance" fill="#60a5fa" radius={[4, 4, 0, 0]}>
+  {monthlyData.map((entry, index) => (
+    <Cell key={`balance-${entry.monthKey}-${index}`} />
+  ))}
+</Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>

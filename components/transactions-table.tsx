@@ -2,11 +2,11 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Edit, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Edit, Trash2, Upload, Plus, Download } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/supabaseClient"
@@ -22,6 +23,10 @@ import { MovementForm } from "./movement-form"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
 import { useToast } from "@/components/ui/simple-toast"
+import Papa from "papaparse"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { createMovement } from "@/lib/create-movement"
+
 // Importar el hook useCurrency
 import { useCurrency } from "@/contexts/currency-context"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -88,11 +93,11 @@ export function TransactionsTable({
 
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState("")
-  const [movementTypeFilter, setMovementTypeFilter] = useState<string>(movementType !== "all" ? movementType : "")
-  const [categoryFilter, setCategoryFilter] = useState<string>("")
-  const [subcategoryFilter, setSubcategoryFilter] = useState<string>("")
-  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("")
-  const [entityFilter, setEntityFilter] = useState<string>("")
+  const [movementTypeFilter, setMovementTypeFilter] = useState<string>(movementType !== "all" ? movementType : "all")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [subcategoryFilter, setSubcategoryFilter] = useState<string>("all")
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all")
+  const [entityFilter, setEntityFilter] = useState<string>("all")
 
   // Estados para opciones de visualización
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
@@ -121,6 +126,12 @@ export function TransactionsTable({
     y: number
     show: boolean
   } | null>(null)
+
+  // Estado para el diálogo de importación CSV
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importErrors, setImportErrors] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -442,13 +453,11 @@ export function TransactionsTable({
 
   // Función para resetear filtros
   const resetFilters = () => {
-    if (movementType === "all") {
-      setMovementTypeFilter("")
-    }
-    setCategoryFilter("")
-    setSubcategoryFilter("")
-    setPaymentTypeFilter("")
-    setEntityFilter("")
+    setMovementTypeFilter("all")
+    setCategoryFilter("all")
+    setSubcategoryFilter("all")
+    setPaymentTypeFilter("all")
+    setEntityFilter("all")
     setSearchTerm("")
     setCurrentPage(1)
   }
@@ -484,6 +493,100 @@ export function TransactionsTable({
     if (movementType === "inversión") return "No se encontraron inversiones"
     return "No se encontraron resultados"
   }
+
+  // Nueva función para manejar el archivo CSV
+  const handleCSVImport = async (file: File) => {
+    setImporting(true)
+    setImportErrors([])
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      delimiter: ";", // <-- Ajusta el delimitador si tu CSV usa punto y coma
+      complete: async (results) => {
+        const rows = results.data as any[]
+        let errors: string[] = []
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i]
+          // Permite ambos sets de nombres de columnas
+          const description = row["description"] || row["detalle"] || ""
+          const movementType = (row["movementType"] || row["movimiento"] || "").toLowerCase()
+          const paymentType = row["paymentType"] || row["formaPago"] || ""
+          const customPaymentType = row["customPaymentType"] || ""
+          const amount = Number(row["amount"] || row["importe"] || 0)
+          const category = row["category"] || row["rubro"] || ""
+          const subCategory = row["subCategory"] || row["subrubro"] || ""
+          const billNumber = row["billNumber"] || row["factura"] || ""
+          const billDate = row["billDate"] || row["fechaComprobante"] || ""
+          const entityName = row["entityName"] || row["empresa"] || ""
+          const entityCuitCuil = row["entityCuitCuil"] || row["cuit_cuil"] || ""
+          const isTaxPayment = (row["isTaxPayment"] || "").toString().toLowerCase() === "true"
+          const relatedTaxId = row["relatedTaxId"] ? Number(row["relatedTaxId"]) : null
+          const check = (row["check"] || "").toString().toLowerCase() === "true"
+
+          // Validaciones previas
+          if (!description || !movementType || !paymentType || !amount || !category || !subCategory || !billNumber || !billDate || !entityName) {
+            errors.push(`Fila ${i + 2}: Faltan campos obligatorios.`)
+            continue
+          }
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(billDate)) {
+            errors.push(`Fila ${i + 2}: La fecha debe estar en formato YYYY-MM-DD.`)
+            continue
+          }
+          if (isNaN(amount) || amount <= 0) {
+            errors.push(`Fila ${i + 2}: El importe debe ser un número mayor a 0.`)
+            continue
+          }
+          if (!["ingreso", "egreso", "inversión"].includes(movementType)) {
+            errors.push(`Fila ${i + 2}: El tipo de movimiento debe ser ingreso, egreso o inversión.`)
+            continue
+          }
+
+          try {
+            await createMovement(
+              {
+                description,
+                movementType,
+                paymentType,
+                customPaymentType,
+                amount,
+                category,
+                subCategory,
+                billNumber,
+                billDate,
+                entityName,
+                entityCuitCuil,
+                selectedTaxes: [], // Si tienes impuestos, mapea aquí
+                isTaxPayment,
+                relatedTaxId,
+                check,
+              },
+              "admin", // Reemplaza por el userId real si lo tienes
+              supabase
+            )
+          } catch (err: any) {
+            errors.push(`Fila ${i + 2}: ${err.message || "Error desconocido"}`)
+          }
+        }
+        setImportErrors(errors)
+        setImporting(false)
+        if (errors.length === 0) {
+          setShowImportDialog(false)
+          toast({
+            title: "Importación exitosa",
+            description: "Todos los movimientos fueron importados correctamente.",
+            type: "success",
+          })
+          fetchTransactions()
+        }
+      },
+      error: (err) => {
+        setImportErrors([err.message])
+        setImporting(false)
+      },
+    })
+  }
+
+  const csvTemplateUrl = "/movements_template.csv" // Asegúrate de que el archivo esté en la carpeta public/
 
   return (
     <div className="space-y-6 w-full">
@@ -528,11 +631,13 @@ export function TransactionsTable({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.description}
-                      </SelectItem>
-                    ))}
+                    {categories
+                      .filter((category) => category.id && category.id !== "")
+                      .map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.description}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -540,14 +645,14 @@ export function TransactionsTable({
               {/* Filtro por subrubro */}
               <div>
                 <Label htmlFor="subcategory">Subrubro</Label>
-                <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter} disabled={!categoryFilter}>
+                <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter} disabled={!categoryFilter || categoryFilter === "all"}>
                   <SelectTrigger id="subcategory">
                     <SelectValue placeholder="Todos los subrubros" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {subcategories
-                      .filter((sub) => !categoryFilter || sub.category_id === categoryFilter)
+                      .filter((sub) => sub.id && sub.id !== "" && (categoryFilter === "all" || sub.category_id === categoryFilter))
                       .map((subcategory) => (
                         <SelectItem key={subcategory.id} value={subcategory.id}>
                           {subcategory.description}
@@ -566,11 +671,13 @@ export function TransactionsTable({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {paymentTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
+                    {paymentTypes
+                      .filter((type) => type && type !== "")
+                      .map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -584,11 +691,13 @@ export function TransactionsTable({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {entities.map((entity) => (
-                      <SelectItem key={entity.id} value={entity.id}>
-                        {entity.nombre}
-                      </SelectItem>
-                    ))}
+                    {entities
+                      .filter((entity) => entity.id && entity.id !== "")
+                      .map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.nombre}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -645,10 +754,41 @@ export function TransactionsTable({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Botón para agregar nuevo movimiento */}
-        <Button variant="default" className="bg-green-700 hover:bg-green-600" onClick={() => setIsDialogOpen(true)}>
-          Ingresar datos
-        </Button>
+        {/* Nuevo Dropdown para ingresar o importar */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="default" className="bg-green-700 hover:bg-green-600 flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Ingresar datos
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                setTimeout(() => {
+                  setIsDialogOpen(true)
+                  setShowImportDialog(false)
+                }, 50)
+              }}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              Ingresar movimiento
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setTimeout(() => {
+                  setShowImportDialog(true)
+                  setIsDialogOpen(false)
+                }, 50)
+              }}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Upload className="h-4 w-4" />
+              Importar desde CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Tabla de transacciones */}
@@ -746,21 +886,21 @@ export function TransactionsTable({
                                 .from("movements")
                                 .update({ check: checked })
                                 .eq("id", transaction.id)
-                              
+
                               if (error) throw error
-                              
+
                               // Actualizar el estado local
                               setTransactions((prev) =>
                                 prev.map((t) =>
                                   t.id === transaction.id ? { ...t, check: checked as boolean } : t
-                                )
+                                ),
                               )
-                              
+
                               // Actualizar también en allTransactions
                               setAllTransactions((prev) =>
                                 prev.map((t) =>
                                   t.id === transaction.id ? { ...t, check: checked as boolean } : t
-                                )
+                                ),
                               )
                             } catch (error) {
                               console.error("Error al actualizar el estado del check:", error)
@@ -903,6 +1043,70 @@ export function TransactionsTable({
         description="¿Está seguro de que desea eliminar este movimiento? Esta acción no se puede deshacer."
         isDeleting={isDeleting}
       />
+
+      {/* Diálogo de importación CSV */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar movimientos desde CSV</DialogTitle>
+            <DialogDescription>
+              Arrastra un archivo CSV aquí o haz clic en "Seleccionar archivo".
+            </DialogDescription>
+            <div className="mt-4 flex items-center gap-2">
+              <a
+                href={csvTemplateUrl}
+                download
+                className="inline-flex items-center px-3 py-1.5 rounded bg-green-700 text-white text-sm font-medium hover:bg-green-800 transition"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar plantilla CSV
+              </a>
+              <span className="text-xs text-muted-foreground">(Formato compatible con la importación)</span>
+            </div>
+          </DialogHeader>
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition"
+            onDrop={(e) => {
+              e.preventDefault()
+              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleCSVImport(e.dataTransfer.files[0])
+              }
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            style={{ minHeight: 150 }}
+          >
+            <Upload className="h-10 w-10 text-gray-400 mb-2" />
+            <span className="text-gray-600">
+              Arrastra el archivo aquí o haz clic para seleccionar
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleCSVImport(e.target.files[0])
+                }
+              }}
+            />
+          </div>
+          {importing && (
+            <div className="text-center text-gray-600 mt-4">Importando movimientos...</div>
+          )}
+          {importErrors.length > 0 && (
+            <div className="mt-4">
+              <div className="text-red-600 font-semibold mb-2">Errores de importación:</div>
+              <ul className="max-h-40 overflow-auto text-sm bg-red-50 border border-red-200 rounded p-2">
+                {importErrors.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
