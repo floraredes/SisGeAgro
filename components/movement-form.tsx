@@ -53,7 +53,7 @@ export function MovementForm({
     movementType: defaultMovementType || "ingreso",
     paymentType: "",
     customPaymentType: "",
-    amount: 0,
+    amount: "", 
     category: "",
     subCategory: "",
     billNumber: "",
@@ -68,10 +68,9 @@ export function MovementForm({
   })
   const [billNumberError, setBillNumberError] = useState<string | null>(null)
   const [cuitCuilError, setCuitCuilError] = useState<string | null>(null)
+  const [showErrors, setShowErrors] = useState(false)
   const isBillNumberRequired = formData.movementType !== "ingreso"
-
-  // Distinguir tipo de usuario
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.type === "admin"
   const isInternal = user?.type === "local"
 
   // Helper para crear entidad según usuario
@@ -209,7 +208,7 @@ export function MovementForm({
       movementType: "ingreso",
       paymentType: "",
       customPaymentType: "",
-      amount: 0,
+      amount: "",
       category: "",
       subCategory: "",
       billNumber: "",
@@ -240,6 +239,7 @@ export function MovementForm({
     e.preventDefault()
     setLoading(true)
     setBillNumberError(null)
+    setShowErrors(true)
 
     try {
       if (!currentUser || (!currentUser.id && !isInternal)) {
@@ -281,35 +281,6 @@ export function MovementForm({
         }
       }
 
-      // Validaciones estándar...
-      if (!formData.movementType) throw new Error("Debe seleccionar un tipo de movimiento")
-      if (!formData.paymentType) {
-        toast({ title: "Error de validación", description: "Debe seleccionar una forma de pago", variant: "destructive" })
-        setLoading(false); return
-      }
-      if (formData.paymentType === "Otro" && !formData.customPaymentType.trim()) {
-        toast({ title: "Error de validación", description: "Debe especificar el método de pago personalizado", variant: "destructive" })
-        setLoading(false); return
-      }
-      if (formData.isTaxPayment && !formData.relatedTaxId) {
-        toast({ title: "Error de validación", description: "Debe seleccionar el tipo de impuesto que está pagando", variant: "destructive" })
-        setLoading(false); return
-      }
-      if (
-        formData.billNumber.trim() &&
-        (!isEditMode || (isEditMode && existingData && formData.billNumber !== existingData.factura))
-      ) {
-        const billNumberExists = await checkBillNumberExists(formData.billNumber)
-        if (billNumberExists) {
-          setBillNumberError("Este número de factura ya existe. Por favor, ingrese uno diferente.")
-          toast({ title: "Error de validación", description: "Este número de factura ya existe. Por favor, ingrese uno diferente.", variant: "destructive" })
-          setLoading(false); return
-        }
-      } else if (isBillNumberRequired && !formData.billNumber.trim()) {
-        setBillNumberError("El número de factura es obligatorio para este tipo de movimiento.")
-        toast({ title: "Error de validación", description: "El número de factura es obligatorio para este tipo de movimiento.", variant: "destructive" })
-        setLoading(false); return
-      }
 
       if (isEditMode && existingData && existingData.id) {
         // Lógica para actualizar un movimiento existente
@@ -475,41 +446,6 @@ export function MovementForm({
 
         // Validaciones estándar para usuarios internos
         if (isInternal) {
-          // Validar tipo de movimiento
-          if (!formData.movementType) {
-            toast({ title: "Error de validación", description: "Debe seleccionar un tipo de movimiento", variant: "destructive" });
-            setLoading(false); return;
-          }
-          // Validar forma de pago
-          if (!formData.paymentType) {
-            toast({ title: "Error de validación", description: "Debe seleccionar una forma de pago", variant: "destructive" });
-            setLoading(false); return;
-          }
-          // Validar método de pago personalizado
-          if (formData.paymentType === "Otro" && !formData.customPaymentType.trim()) {
-            toast({ title: "Error de validación", description: "Debe especificar el método de pago personalizado", variant: "destructive" });
-            setLoading(false); return;
-          }
-          // Validar pago de impuesto
-          if (formData.isTaxPayment && !formData.relatedTaxId) {
-            toast({ title: "Error de validación", description: "Debe seleccionar el tipo de impuesto que está pagando", variant: "destructive" });
-            setLoading(false); return;
-          }
-          // Validar número de factura duplicado
-          if (
-            formData.billNumber.trim()
-          ) {
-            const billNumberExists = await checkBillNumberExists(formData.billNumber);
-            if (billNumberExists) {
-              setBillNumberError("Este número de factura ya existe. Por favor, ingrese uno diferente.");
-              toast({ title: "Error de validación", description: "Este número de factura ya existe. Por favor, ingrese uno diferente.", variant: "destructive" });
-              setLoading(false); return;
-            }
-          } else if (isBillNumberRequired && !formData.billNumber.trim()) {
-            setBillNumberError("El número de factura es obligatorio para este tipo de movimiento.");
-            toast({ title: "Error de validación", description: "El número de factura es obligatorio para este tipo de movimiento.", variant: "destructive" });
-            setLoading(false); return;
-          }
            try {
             const res =await fetch("/api/create-movement", {
               method: "POST",
@@ -550,12 +486,16 @@ export function MovementForm({
       }
 
         // --- ADMINS: con Supabase client ---
-        // 1. Crear/obtener entidad usando helper
+        // 1. Crear/obtener entidad usando helper SOLO si no hay entityId
         let entityData
-        try {
-          entityData = await handleCreateEntity(formData.entityName, formData.entityId)
-        } catch (error: any) {
-          toast({ title: "Error creando entidad", description: error.message || "No se pudo crear la entidad", variant: "destructive" })
+        if (formData.entityId) {
+          entityData = {
+            id: formData.entityId,
+            nombre: formData.entityName,
+            cuit_cuil: formData.entityCuitCuil || formData.cuit_cuil || "",
+          }
+        } else {
+          toast({ title: "Entidad requerida", description: "Debe seleccionar una entidad válida con CUIT/CUIL.", variant: "destructive" })
           setLoading(false)
           return
         }
@@ -726,6 +666,22 @@ export function MovementForm({
   }
   
 
+  // Mover isFormValid aquí para acceder a formData
+  const isFormValid = () => {
+    return (
+      formData.description.trim() &&
+      formData.amount && Number(formData.amount) > 0 &&
+      formData.paymentType &&
+      formData.movementType &&
+      formData.category.trim() &&
+      formData.subCategory.trim() &&
+      formData.billNumber.trim() &&
+      formData.billDate &&
+      formData.entityName.trim() &&
+      formData.entityId
+    );
+  };
+
   return (
     <Dialog
       open={open}
@@ -762,6 +718,10 @@ export function MovementForm({
                   />
                 </div>
 
+                {formData.description.trim() === "" && showErrors && (
+                  <p className="text-xs text-red-500">La descripción es obligatoria.</p>
+                )}
+
                 {/* Opción de pago de impuestos (ocupa toda la fila) */}
                 <div className="space-y-2 md:col-span-2">
                   <div className="flex items-center space-x-2">
@@ -786,7 +746,7 @@ export function MovementForm({
                 {/* Tipo de movimiento */}
                 <div className="space-y-2">
                   <Label>Tipo de movimiento</Label>
-                  <div className="flex gap-4 pt-2">
+                  <div className="flex gap-4 pt-2" role="group" aria-labelledby="tipo-movimiento-label">
                     {MOVEMENT_TYPES.map((type) => (
                       <div key={type} className="flex items-center space-x-2">
                         <Checkbox
@@ -798,7 +758,7 @@ export function MovementForm({
                               movementType: type as "ingreso" | "egreso" | "inversión",
                             }))
                           }
-                          disabled={!!defaultMovementType || formData.isTaxPayment} // Deshabilitar si hay un tipo por defecto o es un pago de impuesto
+                          disabled={!!defaultMovementType || formData.isTaxPayment}
                         />
                         <Label
                           htmlFor={`movement-${type}`}
@@ -815,6 +775,9 @@ export function MovementForm({
                     </p>
                   )}
                 </div>
+                {!formData.movementType && showErrors && (
+                  <p className="text-xs text-red-500">Debes seleccionar un tipo de movimiento.</p>
+                )}
 
                 {/* Selector de impuesto relacionado o campo de monto */}
                 {formData.isTaxPayment ? (
@@ -1042,7 +1005,11 @@ export function MovementForm({
               )}
               </div>
 
-              <Button type="submit" className="w-full bg-[#4F7942] hover:bg-[#3F6932]" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-[#4F7942] hover:bg-[#3F6932]"
+                disabled={loading || !isFormValid()}
+              >
                 {loading ? "Enviando..." : isEditMode ? "Actualizar" : "Enviar"}
               </Button>
             </form>
@@ -1057,8 +1024,10 @@ export function MovementForm({
               ...prev,
               entityName: entity.nombre,
               entityId: entity.id,
-              entityCuitCuil: entity.cuit_cuil,
+              cuit_cuil: entity.cuit_cuil,
+              entityCuitCuil: entity.cuit_cuil, // para compatibilidad
             }))
+            setEntitySelectorOpen(false)
           }}
           onCreateNewEntity={() => {
             setEntitySelectorOpen(false)
@@ -1077,7 +1046,8 @@ export function MovementForm({
                 ...prev,
                 entityName: entity.nombre,
                 entityId: entity.id,
-                entityCuitCuil: entity.cuit_cuil,
+                cuit_cuil: entity.cuit_cuil,
+                entityCuitCuil: entity.cuit_cuil, 
               }))
               setEntityFormOpen(false)
             } catch (error) {

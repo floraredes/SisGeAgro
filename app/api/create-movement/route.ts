@@ -100,6 +100,67 @@ export async function POST(req: NextRequest) {
       const { error: taxError } = await supabase.from("movement_taxes").insert(movementTaxesData);
       if (taxError) throw taxError;
     }
+    // --- Notificación por email si supera el umbral ---
+    // Buscar admins con notificaciones activadas
+    const { data: admins, error: adminError } = await supabase
+      .from("notification_settings")
+      .select("user_id, email_notifications, expense_threshold")
+      .eq("email_notifications", true);
+
+    if (!adminError && admins && admins.length > 0) {
+      for (const admin of admins) {
+        if (form.amount >= (admin.expense_threshold || 0)) {
+          // Obtener email del admin
+          const { data: userData, error: userError } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", admin.user_id)
+            .single();
+          if (userError || !userData?.email) {
+            continue;
+          }
+          // Enviar email
+          try {
+            const notifRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/send-notification`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: userData.email,
+                subject: "Nuevo movimiento por encima del umbral",
+                text: `Se ha registrado un movimiento por $${form.amount}.\n`,
+                html: `<p>Se ha registrado un movimiento por <b>$${form.amount}</b>.</p>`
+              }),
+            });
+            const notifJson = await notifRes.json();
+            if (!notifRes.ok) {
+              // Error enviando email
+            }
+          } catch (err) {
+            // Error fetch notificación
+          }
+          // Insertar notificación in-app
+          try {
+            const { error: notifError } = await supabase
+              .from("notifications")
+              .insert({
+                user_id: admin.user_id,
+                type: "movement_threshold",
+                title: "Movimiento por encima del umbral",
+                body: `Se ha registrado un movimiento por $${form.amount}.
+`,
+                link: "/dashboard/tabla",
+                read: false,
+                created_at: new Date().toISOString(),
+              });
+            if (notifError) {
+              console.error("Error insertando notificación in-app:", notifError);
+            }
+          } catch (err) {
+            console.error("Error catch insertando notificación in-app:", err);
+          }
+        }
+      }
+    }
 
     return NextResponse.json({ movement }, { status: 201 });
 

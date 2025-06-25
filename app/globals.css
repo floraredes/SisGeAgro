@@ -144,3 +144,10 @@
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
+
+.radix-dialog-overlay {
+  pointer-events: auto;
+}
+#logout-btn {
+  pointer-events: auto !important;
+}

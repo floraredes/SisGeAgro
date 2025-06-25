@@ -1,5 +1,6 @@
 "use client"
 
+import { createPortal } from "react-dom"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/supabaseClient"
@@ -66,12 +67,6 @@ export default function UserMovementPage() {
         borderRadius: "50%", background: "rgba(79, 121, 66, 0.15)", filter: "blur(50px)", zIndex: 0,
       }} />
 
-      <button
-        className="absolute top-6 right-6 py-2 px-4 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition z-10"
-        onClick={handleLogout}
-      >
-        Salir
-      </button>
 
       {/* Formulario directamente, NO en Dialog */}
       <div className="w-full max-w-2xl z-10">
@@ -83,6 +78,30 @@ export default function UserMovementPage() {
           onSuccess={() => router.push("/user-movement/success")}
         />
       </div>
+
+      {/* Botón de logout en portal */}
+      {typeof window !== "undefined" &&
+        createPortal(
+          <button
+            id="logout-btn"
+            onClick={handleLogout}
+            style={{
+              position: "fixed",
+              top: 24,
+              right: 24,
+              zIndex: 2147483647,
+              background: "#4F7942",
+              color: "white",
+              borderRadius: 8,
+              padding: "10px 20px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              pointerEvents: "auto", // Forzar pointer events
+            }}
+          >
+            Logout
+          </button>,
+          document.body
+        )}
     </div>
   )
 }
