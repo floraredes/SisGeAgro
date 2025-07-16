@@ -32,19 +32,21 @@ export async function POST(request: Request) {
 
     // Insertar el perfil en la tabla personalizada `users`
     if (user) {
-      const updateResult = await supabaseAdmin
+      const insertResult = await supabaseAdmin
         .from("users")
-        .update({
+        .insert({
+          id: user.id,
+          email: user.email,
           role,
           type: "local",
           username: username || email.split("@")[0],
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
+        });
 
-      if (updateResult.error) {
-        console.error("Error al actualizar perfil en users:", updateResult.error);
-        return NextResponse.json({ message: updateResult.error.message }, { status: 500 });
+      if (insertResult.error) {
+        console.error("Error al insertar perfil en users:", insertResult.error);
+        return NextResponse.json({ message: insertResult.error.message }, { status: 500 });
       }
     }
 

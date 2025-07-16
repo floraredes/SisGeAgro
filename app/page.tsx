@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase/supabaseClient"
+import { getCurrentUser } from "@/lib/auth-utils"
 
 export default function HomePage() {
   const router = useRouter()
@@ -11,30 +11,16 @@ export default function HomePage() {
   useEffect(() => {
     const checkSessionAndRedirect = async () => {
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        const currentUser = await getCurrentUser()
 
-        if (sessionError || !sessionData.session) {
-          setCheckingSession(false)
-          router.replace("/auth")
-          return
-        }
-
-        const userId = sessionData.session.user.id
-        const { data: userProfile, error: userError } = await supabase
-          .from("users")
-          .select("id, role")
-          .eq("id", userId)
-          .single()
-
-        if (userError || !userProfile) {
-          await supabase.auth.signOut()
+        if (!currentUser) {
           setCheckingSession(false)
           router.replace("/auth")
           return
         }
 
         setCheckingSession(false)
-        if (userProfile.role === "admin") {
+        if (currentUser.role === "admin") {
           router.replace("/dashboard")
         } else {
           router.replace("/user-movement")

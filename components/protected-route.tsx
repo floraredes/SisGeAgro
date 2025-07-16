@@ -4,24 +4,24 @@ import type React from "react"
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase/supabaseClient"
+import { isAuthenticated } from "@/lib/auth-utils"
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticatedState, setIsAuthenticatedState] = useState(false)
 
   // Use useCallback to prevent recreation of this function on each render
   const checkAuth = useCallback(async () => {
     try {
-      const { data, error } = await supabase.auth.getSession()
+      const authenticated = await isAuthenticated()
 
-      if (error || !data.session) {
+      if (!authenticated) {
         router.push("/auth")
         return
       }
 
-      setIsAuthenticated(true)
+      setIsAuthenticatedState(true)
     } catch (error) {
       console.error("Authentication check failed:", error)
       router.push("/auth")
@@ -45,6 +45,6 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     )
   }
 
-  return isAuthenticated ? <>{children}</> : null
+  return isAuthenticatedState ? <>{children}</> : null
 }
 

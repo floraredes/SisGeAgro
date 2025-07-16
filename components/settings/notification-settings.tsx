@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import { getCurrentUser } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/simple-toast"
 
 export function NotificationSettings() {
@@ -33,40 +34,42 @@ export function NotificationSettings() {
       try {
         setLoading(true)
 
-        // Obtener usuario actual
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
+        // Obtener usuario actual usando las nuevas utilidades
+        const currentUser = await getCurrentUser()
 
-        if (userError) {
-          throw userError
+        if (!currentUser) {
+          toast({
+            title: "Error de autenticación",
+            description: "No se pudo verificar tu identidad",
+            type: "error",
+          })
+          return
         }
 
-        if (user) {
-          setUserId(user.id)
+        setUserId(currentUser.id)
 
-          // Obtener configuraciones de notificación de la base de datos
-          const { data, error } = await supabase
-            .from("notification_settings")
-            .select("*")
-            .eq("user_id", user.id)
-            .single()
+        // Obtener configuraciones de notificación de la base de datos
+        const { data, error } = await supabase
+          .from("notification_settings")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .single()
 
-          if (!error && data) {
-            setSettings({
-              emailNotifications: data.email_notifications || true,
-              appNotifications: data.app_notifications || true,
-              expenseThreshold: data.expense_threshold?.toString() || "5000",
-              notificationFrequency: data.notification_frequency || "daily",
-              newTransactionNotifications: data.new_transaction_notifications || true,
-              pendingApprovalNotifications: data.pending_approval_notifications || true,
-              systemUpdates: data.system_updates || false,
-            })
-          } else {
-            // Si no hay configuraciones, crear un registro por defecto
+        if (!error && data) {
+          setSettings({
+            emailNotifications: data.email_notifications || true,
+            appNotifications: data.app_notifications || true,
+            expenseThreshold: data.expense_threshold?.toString() || "5000",
+            notificationFrequency: data.notification_frequency || "daily",
+            newTransactionNotifications: data.new_transaction_notifications || true,
+            pendingApprovalNotifications: data.pending_approval_notifications || true,
+            systemUpdates: data.system_updates || false,
+          })
+        } else {
+          // Si no hay configuraciones, crear un registro por defecto
+          try {
             const { error: insertError } = await supabase.from("notification_settings").insert({
-              user_id: user.id,
+              user_id: currentUser.id,
               email_notifications: true,
               app_notifications: true,
               expense_threshold: 5000,
@@ -77,9 +80,11 @@ export function NotificationSettings() {
             })
 
             if (insertError && insertError.code !== "23505") {
-              // Ignorar error de duplicado
-              console.error("Error creating default notification settings:", insertError)
+              // Ignorar error de duplicado, pero loggear otros errores
+              console.warn("No se pudieron crear configuraciones por defecto:", insertError)
             }
+          } catch (insertError) {
+            console.warn("Error al crear configuraciones por defecto:", insertError)
           }
         }
       } catch (error) {
@@ -120,7 +125,14 @@ export function NotificationSettings() {
   }
 
   const handleSaveSettings = async () => {
-    if (!userId) return
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "No se pudo identificar al usuario",
+        type: "error",
+      })
+      return
+    }
 
     try {
       setSaving(true)

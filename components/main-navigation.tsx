@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Timer, ArrowDownToLine, ArrowUpFromLine, Table2, Settings, LogOut, Menu } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { supabase } from "@/lib/supabase/supabaseClient"
+import { logout } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/simple-toast"
 
 export function MainNavigation() {
@@ -20,7 +20,7 @@ export function MainNavigation() {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut()
+      await logout()
       toast({
         title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente",

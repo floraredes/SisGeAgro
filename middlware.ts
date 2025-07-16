@@ -2,10 +2,11 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(req: NextRequest) {
-  // Get auth cookie
+  // Get auth cookie for Supabase Auth
   const hasAuthCookie = req.cookies.has("supabase-auth-token") || req.cookies.has("sb-access-token")
-
-  // Check if the user is authenticated
+  
+  // Check for local user in cookies (if you want to store local user info in cookies)
+  // For now, we'll rely on the client-side checks since localStorage is not available in middleware
   const isAuthenticated = hasAuthCookie
   const isAuthPage = req.nextUrl.pathname.startsWith("/auth")
   const isPublicPage = ["/"].includes(req.nextUrl.pathname)

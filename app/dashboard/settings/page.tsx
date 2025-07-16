@@ -8,6 +8,7 @@ import { NotificationSettings } from "@/components/settings/notification-setting
 import { UserManagementSettings } from "@/components/settings/user-management-settings"
 import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { getCurrentUser } from "@/lib/auth-utils"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { AlertCircle } from "lucide-react"
 
@@ -23,22 +24,19 @@ export default function SettingsPage() {
       try {
         setLoading(true)
 
-        // Obtener la sesión actual
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
+        // Obtener el usuario actual usando las nuevas utilidades
+        const currentUser = await getCurrentUser()
 
-        if (sessionError || !session) {
+        if (!currentUser) {
           router.push("/auth")
           return
         }
 
-        // Obtener el perfil del usuario desde la tabla users
+        // Obtener el perfil completo del usuario desde la tabla users
         const { data: profile, error: profileError } = await supabase
           .from("users")
           .select("*")
-          .eq("id", session.user.id)
+          .eq("id", currentUser.id)
           .single()
 
         if (profileError) {

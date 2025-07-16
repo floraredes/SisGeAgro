@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { PlusIcon, Trash2Icon, PencilIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import { getCurrentUser } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/simple-toast"
 
 interface User {
@@ -58,23 +59,21 @@ export function UserManagementSettings() {
     try {
       setLoading(true)
 
-      // Obtener el usuario actual para verificar si es admin
-      const {
-        data: { user: currentUser },
-        error: currentUserError,
-      } = await supabase.auth.getUser()
+      // Obtener el usuario actual usando las nuevas utilidades
+      const currentUser = await getCurrentUser()
 
-      if (currentUserError) {
-        throw currentUserError
+      if (!currentUser) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo verificar tu identidad",
+          type: "error",
+        })
+        setUsers([])
+        return
       }
 
-      // Verificar si el usuario actual existe en la tabla users
-      let { data: currentProfile, error: currentProfileError } = await supabase
-        .from("users")
-        .select("role, type")
-        .eq("id", currentUser?.id)
-
-      if (!currentProfile || currentProfile.length === 0 || currentProfile[0].role !== "admin") {
+      // Verificar si el usuario actual es admin
+      if (currentUser.role !== "admin") {
         toast({
           title: "Acceso restringido",
           description: "Solo los administradores pueden gestionar usuarios",
@@ -119,11 +118,10 @@ const handleAddUser = async (e: React.FormEvent) => {
   e.preventDefault()
 
   try {
-    // Verificar la sesión actual
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError) throw sessionError
+    // Obtener el usuario actual usando las nuevas utilidades
+    const currentUser = await getCurrentUser()
 
-    if (!sessionData.session) {
+    if (!currentUser) {
       toast({
         title: "Sesión expirada",
         description: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
@@ -133,42 +131,8 @@ const handleAddUser = async (e: React.FormEvent) => {
       return
     }
 
-    const {
-      data: { user: currentUser },
-      error: currentUserError,
-    } = await supabase.auth.getUser()
-
-    if (currentUserError || !currentUser) {
-      const { error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError) {
-        toast({
-          title: "Error de autenticación",
-          description: "No se pudo verificar tu identidad. Por favor, inicia sesión nuevamente.",
-          type: "error",
-        })
-        window.location.href = "/auth"
-        return
-      }
-
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error || !user) {
-        throw error || new Error("No se pudo obtener la información del usuario")
-      }
-    }
-
     // Verificar si es admin
-    const { data: currentProfile, error: currentProfileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", currentUser?.id)
-      .single()
-
-    if (currentProfileError) throw currentProfileError
-
-    if (currentProfile?.role !== "admin") {
+    if (currentUser.role !== "admin") {
       toast({
         title: "Acceso restringido",
         description: "Solo los administradores pueden crear usuarios",
@@ -246,48 +210,20 @@ const handleAddUser = async (e: React.FormEvent) => {
     if (!selectedUser) return
 
     try {
-      // Verificar si el usuario actual es admin
-      const {
-        data: { user: currentUser },
-        error: currentUserError,
-      } = await supabase.auth.getUser()
+      // Obtener el usuario actual usando las nuevas utilidades
+      const currentUser = await getCurrentUser()
 
-      if (currentUserError) {
-        throw currentUserError
+      if (!currentUser) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo verificar tu identidad",
+          type: "error",
+        })
+        return
       }
 
-      // Primero verificar si el usuario actual existe en la tabla users
-      let { data: currentProfile, error: currentProfileError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", currentUser?.id)
-        .single()
-
-      // Si el usuario no existe en la tabla users, crearlo automáticamente como admin
-      if (currentProfileError && currentProfileError.code === "PGRST116") {
-        // El usuario no existe en la tabla users, crearlo
-        const { data: newProfile, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: currentUser?.id,
-            username: currentUser?.email?.split("@")[0] || "admin",
-            email: currentUser?.email,
-            role: "admin", // El primer usuario será admin
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        currentProfile = newProfile
-      } else if (currentProfileError) {
-        throw currentProfileError
-      }
-
-      // Si no es admin, mostrar mensaje y terminar
-      if (currentProfile?.role !== "admin") {
+      // Verificar si es admin
+      if (currentUser.role !== "admin") {
         toast({
           title: "Acceso restringido",
           description: "Solo los administradores pueden editar usuarios",
@@ -332,48 +268,20 @@ const handleAddUser = async (e: React.FormEvent) => {
     if (!selectedUser) return
 
     try {
-      // Verificar si el usuario actual es admin
-      const {
-        data: { user: currentUser },
-        error: currentUserError,
-      } = await supabase.auth.getUser()
+      // Obtener el usuario actual usando las nuevas utilidades
+      const currentUser = await getCurrentUser()
 
-      if (currentUserError) {
-        throw currentUserError
+      if (!currentUser) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo verificar tu identidad",
+          type: "error",
+        })
+        return
       }
 
-      // Primero verificar si el usuario actual existe en la tabla users
-      let { data: currentProfile, error: currentProfileError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", currentUser?.id)
-        .single()
-
-      // Si el usuario no existe en la tabla users, crearlo automáticamente como admin
-      if (currentProfileError && currentProfileError.code === "PGRST116") {
-        // El usuario no existe en la tabla users, crearlo
-        const { data: newProfile, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: currentUser?.id,
-            username: currentUser?.email?.split("@")[0] || "admin",
-            email: currentUser?.email,
-            role: "admin", // El primer usuario será admin
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          throw insertError
-        }
-
-        currentProfile = newProfile
-      } else if (currentProfileError) {
-        throw currentProfileError
-      }
-
-      // Si no es admin, mostrar mensaje y terminar
-      if (currentProfile?.role !== "admin") {
+      // Verificar si es admin
+      if (currentUser.role !== "admin") {
         toast({
           title: "Acceso restringido",
           description: "Solo los administradores pueden eliminar usuarios",

@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import { getCurrentUser } from "@/lib/auth-utils"
 import { Badge } from "@/components/ui/badge"
 import { BellIcon } from "lucide-react"
 import { MainNavigation } from "@/components/main-navigation"
@@ -29,38 +30,27 @@ export default function DashboardLayout({
     const checkAuth = async () => {
       try {
         setLoading(true)
-        const { data, error } = await supabase.auth.getSession()
-
-        if (error || !data.session) {
-          console.error("Error durante autenticación:", error)
+        
+        const currentUser = await getCurrentUser()
+        
+        if (!currentUser) {
+          console.error("Usuario no autenticado")
           router.push("/auth")
           return
         }
 
-        const user = data.session.user
-        setUserId(user.id)
-
-        // Obtener el nombre desde la tabla unificada `profiles`
-        const { data: userProfile, error: profileError } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", user.id)
-          .single()
-
-        if (profileError) {
-          console.error("Error al obtener perfil del usuario:", profileError)
-        }
-
-        const displayName = userProfile?.username || user.email?.split("@")[0] || "Usuario"
+        setUserId(currentUser.id)
+        const displayName = currentUser.email?.split("@")[0] || "Usuario"
         setUserName(displayName)
 
-        // Consultar notificaciones no leídas
+        // Consultar notificaciones
         const { data: notifData, error: notifError } = await supabase
           .from("notifications")
           .select("id, title, body, link, read, created_at, type")
-          .eq("user_id", user.id)
+          .eq("user_id", currentUser.id)
           .order("created_at", { ascending: false })
           .limit(20)
+        
         if (!notifError && notifData) {
           setNotifications(notifData)
           setUnreadCount(notifData.filter((n:any) => !n.read).length)
