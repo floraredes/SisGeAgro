@@ -9,6 +9,29 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.json();
 
+    // --- Obtener o crear entidad si no hay entityId pero sí entityName/cuitCuil ---
+    let entityId = form.entityId;
+    if (!entityId && (form.entityName || form.entityCuitCuil)) {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/create-entity`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: form.entityName,
+            cuit_cuil: form.entityCuitCuil,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.entity && data.entity.id) {
+          entityId = data.entity.id;
+        } else {
+          return NextResponse.json({ error: data.error || "No se pudo crear/obtener la entidad" }, { status: 400 });
+        }
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message || "Error creando entidad" }, { status: 500 });
+      }
+    }
+
     // 1. Crear payment
     const { data: payment, error: paymentError } = await supabase
       .from("payment")
@@ -24,11 +47,22 @@ export async function POST(req: NextRequest) {
         bill_number: form.billNumber || `AUTO-${Date.now()}`,
         bill_date: form.billDate,
         bill_amount: form.amount,
-        entity_id: form.entityId,
+        entity_id: entityId,
       }])
       .select()
       .single();
-    if (billError) throw billError;
+    if (billError) {
+      if (
+        billError.code === "23505" &&
+        billError.message?.includes("Bills_bill_number_key")
+      ) {
+        return NextResponse.json(
+          { error: "El número de factura ya existe." },
+          { status: 409 }
+        );
+      }
+      throw billError;
+    }
 
     // 3. Buscar o crear categoría
     let { data: category, error: categoryFetchError } = await supabase
@@ -73,6 +107,7 @@ export async function POST(req: NextRequest) {
       .single();
     if (operationError) throw operationError;
 
+    
     // 6. Crear movement
     const { data: movement, error: movementError } = await supabase
       .from("movements")
@@ -81,7 +116,7 @@ export async function POST(req: NextRequest) {
         movement_type: form.movementType,
         operation_id: operation.id,
         sub_category_id: subcategory[0].id,
-        created_by: form.username,
+        created_by: form.user_id,
         is_tax_payment: form.isTaxPayment,
         related_tax_id: form.isTaxPayment ? form.relatedTaxId : null,
         check: form.check,
@@ -146,8 +181,7 @@ export async function POST(req: NextRequest) {
                 user_id: admin.user_id,
                 type: "movement_threshold",
                 title: "Movimiento por encima del umbral",
-                body: `Se ha registrado un movimiento por $${form.amount}.
-`,
+                body: `Se ha registrado un movimiento por $${form.amount}.`,
                 link: "/dashboard/tabla",
                 read: false,
                 created_at: new Date().toISOString(),

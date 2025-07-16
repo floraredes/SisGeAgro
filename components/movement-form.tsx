@@ -73,49 +73,29 @@ export function MovementForm({
   const isAdmin = user?.type === "admin"
   const isInternal = user?.type === "local"
 
-  // Helper para crear entidad según usuario
+  // Helper para crear entidad (siempre por API)
   const handleCreateEntity = async (nombre: string, cuit_cuil: string) => {
-    if (isAdmin) {
-      const { data, error } = await supabase
-        .from("entity")
-        .upsert({ nombre, cuit_cuil }, { onConflict: "cuit_cuil" })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    } else {
-      const res = await fetch("/api/create-entity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, cuit_cuil }),
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Error creando entidad")
-      return result.entity
-    }
-  }
+    const res = await fetch("/api/create-entity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre, cuit_cuil }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Error creando entidad");
+    return result.entity;
+  };
 
-  // Helper para crear impuesto según usuario
+  // Helper para crear impuesto (siempre por API)
   const handleCreateTax = async (name: string, percentage: number) => {
-    if (isAdmin) {
-      const { data, error } = await supabase
-        .from("taxes")
-        .insert([{ name, percentage }])
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    } else {
-      const res = await fetch("/api/create-tax", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, percentage }),
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Error creando impuesto")
-      return result.tax
-    }
-  }
+    const res = await fetch("/api/create-tax", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, percentage }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Error creando impuesto");
+    return result.tax;
+  };
 
   useEffect(() => {
     if (open) {
@@ -140,24 +120,30 @@ export function MovementForm({
           console.error("Error formatting date:", error)
         }
       }
-      setFormData({
-        description: existingData.detalle || "",
-        movementType: existingData.movimiento || defaultMovementType || "ingreso",
-        paymentType: existingData.formaPago || "",
+      // Si no viene el cuit_cuil, intentar obtenerlo de la entidad asociada
+      let entityCuitCuil = existingData.entityCuitCuil || existingData.cuit_cuil || (existingData.entity && existingData.entity.cuit_cuil) || "";
+      let entityName = existingData.empresa || (existingData.entity && existingData.entity.nombre) || "";
+      let entityId = existingData.entityId || (existingData.entity && existingData.entity.id) || "";
+      setFormData((prev) => ({
+        ...prev,
+        description: existingData.detalle ?? prev.description ?? "",
+        movementType: existingData.movimiento ?? prev.movementType ?? defaultMovementType ?? "ingreso",
+        paymentType: existingData.formaPago ?? prev.paymentType ?? "",
         customPaymentType:
-          existingData.formaPago && !PAYMENT_TYPES.includes(existingData.formaPago) ? existingData.formaPago : "",
-        amount: existingData.importe || 0,
-        category: existingData.rubro || "",
-        subCategory: existingData.subrubro || "",
-        billNumber: existingData.factura || "",
-        billDate: formattedDate,
-        entityName: existingData.empresa || "",
-        entityId: existingData.entityId || "",
-        selectedTaxes: existingData.taxes || [],
-        isTaxPayment: existingData.isTaxPayment || false,
-        relatedTaxId: existingData.relatedTaxId || null,
-        check: existingData.check || false,
-      })
+          (existingData.formaPago && !PAYMENT_TYPES.includes(existingData.formaPago)) ? existingData.formaPago : (prev.customPaymentType ?? ""),
+        amount: existingData.importe ?? prev.amount ?? 0,
+        category: existingData.rubro ?? prev.category ?? "",
+        subCategory: existingData.subrubro ?? prev.subCategory ?? "",
+        billNumber: existingData.factura ?? prev.billNumber ?? "",
+        billDate: formattedDate ?? prev.billDate ?? "",
+        entityName: entityName || prev.entityName || "",
+        entityId: entityId || prev.entityId || "",
+        entityCuitCuil: entityCuitCuil || prev.entityCuitCuil || "",
+        selectedTaxes: existingData.taxes ?? prev.selectedTaxes ?? [],
+        isTaxPayment: existingData.isTaxPayment ?? prev.isTaxPayment ?? false,
+        relatedTaxId: existingData.relatedTaxId ?? prev.relatedTaxId ?? null,
+        check: existingData.check ?? prev.check ?? false,
+      }))
     }
     // eslint-disable-next-line
   }, [isEditMode, existingData, open, defaultMovementType])
@@ -236,414 +222,133 @@ export function MovementForm({
 
   // ---- ADAPTADO: handleSubmit bifurca creación de entidad por helpers ----
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setBillNumberError(null)
-    setShowErrors(true)
+    e.preventDefault();
+    setLoading(true);
+    setBillNumberError(null);
+    setShowErrors(true);
 
     try {
-      if (!currentUser || (!currentUser.id && !isInternal)) {
-        throw new Error("Debe iniciar sesión para realizar esta acción")
+      if (!currentUser || !currentUser.id) {
+        throw new Error("Debe iniciar sesión para realizar esta acción");
       }
-
-      // Verificar perfil (solo admins)
-      if (isAdmin) {
-        try {
-          const { data: existingProfiles, error: profileCheckError } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("id", currentUser.id)
-          if (profileCheckError) {
-            console.error("Error al verificar el perfil:", profileCheckError)
-            throw new Error("Error al verificar el perfil del usuario")
-          }
-          if (!existingProfiles || existingProfiles.length === 0) {
-            let username = "Usuario"
-            if (currentUser.email) {
-              username = currentUser.email.split("@")[0]
-            } else if (currentUser.user_metadata?.username) {
-              username = currentUser.user_metadata.username
-            }
-            const { error: profileCreateError } = await supabase.from("profiles").insert([{
-              id: currentUser.id,
-              email: currentUser.email || "",
-              username: username,
-              created_at: new Date().toISOString(),
-            }])
-            if (profileCreateError) {
-              console.error("Error al crear el perfil del usuario:", profileCreateError)
-              throw new Error("No se pudo crear el perfil del usuario")
-            }
-          }
-        } catch (error) {
-          console.error("Error en la gestión del perfil:", error)
-          throw new Error("Error al gestionar el perfil del usuario")
-        }
-      }
-
 
       if (isEditMode && existingData && existingData.id) {
-        // Lógica para actualizar un movimiento existente
-        // Aquí implementaremos la actualización del movimiento
-
-        // Actualizar la entidad
-        const { data: entityData, error: entityError } = await supabase
-          .from("entity")
-          .upsert(
-            {
-              nombre: formData.entityName,
-              cuit_cuil: formData.entityId,
-            },
-            { onConflict: "cuit_cuil" },
-          )
-          .select()
-          .single()
-
-        if (entityError) throw entityError
-
-        // Obtener el ID de la operación asociada al movimiento
-        const { data: movementData, error: movementFetchError } = await supabase
-          .from("movements")
-          .select("operation_id")
-          .eq("id", existingData.id)
-          .single()
-
-        if (movementFetchError) throw movementFetchError
-
-        // Obtener los datos de la operación
-        const { data: operationData, error: operationFetchError } = await supabase
-          .from("operations")
-          .select("payment_id, bill_id")
-          .eq("id", movementData.operation_id)
-          .single()
-
-        if (operationFetchError) throw operationFetchError
-
-        // Actualizar el método de pago
-        const { error: paymentUpdateError } = await supabase
-          .from("payment")
-          .update({
-            payment_type: formData.paymentType === "Otro" ? formData.customPaymentType : formData.paymentType,
-          })
-          .eq("id", operationData.payment_id)
-
-        if (paymentUpdateError) throw paymentUpdateError
-
-        // Actualizar la factura
-        const { error: billUpdateError } = await supabase
-          .from("bills")
-          .update({
-            bill_number: formData.billNumber,
-            bill_date: formData.billDate,
-            bill_amount: formData.amount,
-            entity_id: entityData.id,
-          })
-          .eq("id", operationData.bill_id)
-
-        if (billUpdateError) throw billUpdateError
-
-        // Actualizar categoría y subcategoría
-        // Primero verificar si la categoría existe
-        let categoryData
-        const { data: existingCategories, error: categoryFetchError } = await supabase
-          .from("category")
-          .select("*")
-          .ilike("description", formData.category.toUpperCase())
-          .limit(1)
-
-        if (categoryFetchError) throw categoryFetchError
-
-        if (existingCategories && existingCategories.length > 0) {
-          categoryData = existingCategories[0]
-        } else {
-          const { data: newCategory, error: categoryInsertError } = await supabase
-            .from("category")
-            .insert([{ description: formData.category.toUpperCase() }])
-            .select()
-            .single()
-
-          if (categoryInsertError) throw categoryInsertError
-          categoryData = newCategory
-        }
-
-        // Verificar si la subcategoría existe
-        let subcategoryData
-        const { data: existingSubcategories, error: subcategoryFetchError } = await supabase
-          .from("sub_category")
-          .select("*")
-          .ilike("description", formData.subCategory.toUpperCase())
-          .eq("category_id", categoryData.id)
-          .limit(1)
-
-        if (subcategoryFetchError) throw subcategoryFetchError
-
-        if (existingSubcategories && existingSubcategories.length > 0) {
-          subcategoryData = existingSubcategories[0]
-        } else {
-          const { data: newSubcategory, error: subcategoryInsertError } = await supabase
-            .from("sub_category")
-            .insert([
-              {
-                description: formData.subCategory.toUpperCase(),
-                category_id: categoryData.id,
-              },
-            ])
-            .select()
-            .single()
-
-          if (subcategoryInsertError) throw subcategoryInsertError
-          subcategoryData = newSubcategory
-        }
-
-        // Actualizar el movimiento con los nuevos campos de pago de impuestos
-        const { error: movementUpdateError } = await supabase
-          .from("movements")
-          .update({
-            description: formData.description,
-            movement_type: formData.movementType,
-            sub_category_id: subcategoryData.id,
-            is_tax_payment: formData.isTaxPayment,
-            related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
-            check: formData.check,
-          })
-          .eq("id", existingData.id)
-
-        if (movementUpdateError) throw movementUpdateError
-
-        // Eliminar los impuestos existentes y agregar los nuevos
-        const { error: taxDeleteError } = await supabase
-          .from("movement_taxes")
-          .delete()
-          .eq("movement_id", existingData.id)
-
-        if (taxDeleteError) throw taxDeleteError
-
-        // Agregar los nuevos impuestos
-        if (formData.selectedTaxes.length > 0) {
-          const movementTaxesData = formData.selectedTaxes.map((tax: Tax) => ({
-            movement_id: existingData.id,
-            tax_id: tax.id,
-            calculated_amount: (formData.amount * tax.percentage) / 100,
-          }))
-
-          const { error: taxInsertError } = await supabase.from("movement_taxes").insert(movementTaxesData)
-
-          if (taxInsertError) throw taxInsertError
-        }
-
-        toast({
-          title: "¡Movimiento actualizado con éxito!",
-          description: `Se ha actualizado correctamente el movimiento por $${formData.amount.toFixed(2)}`,
-          type: "success",
-        })
-
-        // Llamar al callback de éxito si existe
-        if (onSuccess) {
-          onSuccess()
-        }
-      } else {
-        // ---- CREACIÓN NUEVO MOVIMIENTO ----
-
-        // Validaciones estándar para usuarios internos
-        if (isInternal) {
-           try {
-            const res =await fetch("/api/create-movement", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...formData,
-                username: currentUser.username,
-                entityId: formData.entityId || "",
-                entityCuitCuil: formData.entityCuitCuil || "",
-              }),
-            });
-            const result = await res.json();
-            if (!res.ok) {
-              throw new Error(result.error || "Error creando movimiento");
+        // --- EDICIÓN DE MOVIMIENTO: SOLO CAMPOS MODIFICADOS ---
+        setLoading(true);
+        try {
+          // Detectar campos modificados
+          const changedFields: any = { movementId: existingData.id };
+          const keys = [
+            "entityName",
+            "entityCuitCuil",
+            "paymentType",
+            "customPaymentType",
+            "billNumber",
+            "billDate",
+            "amount",
+            "category",
+            "subCategory",
+            "isTaxPayment",
+            "relatedTaxId",
+            "check",
+            "selectedTaxes",
+            "description",
+            "movementType",
+          ];
+          keys.forEach((key) => {
+            // Para selectedTaxes, comparar por JSON.stringify
+            if (key === "selectedTaxes") {
+              if (JSON.stringify(formData.selectedTaxes) !== JSON.stringify(existingData.taxes || [])) {
+                changedFields.selectedTaxes = formData.selectedTaxes;
+              }
+            } else if (formData[key] !== (existingData[key] ?? "")) {
+              changedFields[key] = formData[key];
             }
-
-            toast({
-              title: "¡Movimiento registrado con éxito!",
-              description: "El movimiento fue creado correctamente.",
-              type: "success",
-           });
-
-           resetForm();
-           setTimeout(() => {
-             onOpenChange(false);
-             if (onSuccess) onSuccess();
-           }, 500);
-         } catch (error: any) {
+          });
+          // Si no hay cambios, no enviar
+          if (Object.keys(changedFields).length === 1) {
+            toast({ title: "Sin cambios", description: "No se detectaron cambios para actualizar.", type: "info" });
+            setLoading(false);
+            return;
+          }
+          const res = await fetch("/api/edit-movement", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(changedFields),
+          });
+          const result = await res.json();
+          if (!res.ok) {
+            throw new Error(result.error || "Error actualizando movimiento");
+          }
           toast({
-            title: "Error creando movimiento",
-            description: error.message || "No se pudo crear el movimiento",
+            title: "¡Movimiento actualizado con éxito!",
+            description: `Se ha actualizado correctamente el movimiento por $${formData.amount.toFixed(2)}`,
+            type: "success",
+          });
+          if (onSuccess) onSuccess();
+          setTimeout(() => {
+            onOpenChange(false);
+          }, 500);
+        } catch (error: any) {
+          toast({
+            title: "Error actualizando movimiento",
+            description: error.message || "No se pudo actualizar el movimiento",
             variant: "destructive",
-          })
+          });
         } finally {
           setLoading(false);
         }
         return;
+      } else {
+        // --- CREACIÓN NUEVO MOVIMIENTO CENTRALIZADA EN API ---
+        // Forzar check a false para usuarios internos
+        const checkValue = isInternal ? false : formData.check;
+        const res = await fetch("/api/create-movement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...formData,
+            user_id: currentUser.id,
+            entityId: formData.entityId || "",
+            entityCuitCuil: formData.entityCuitCuil || "",
+            check: checkValue,
+          }),
+        });
+        const result = await res.json();
+        if (res.status === 409) {
+          setBillNumberError(result.error);
+          setLoading(false);
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(result.error || "Error creando movimiento");
+        }
+        toast({
+          title: "¡Movimiento registrado con éxito!",
+          description: "El movimiento fue creado correctamente.",
+          type: "success",
+        });
+        resetForm();
+        setTimeout(() => {
+          onOpenChange(false);
+          if (onSuccess) onSuccess();
+        }, 500);
       }
-
-        // --- ADMINS: con Supabase client ---
-        // 1. Crear/obtener entidad usando helper SOLO si no hay entityId
-        let entityData
-        if (formData.entityId) {
-          entityData = {
-            id: formData.entityId,
-            nombre: formData.entityName,
-            cuit_cuil: formData.entityCuitCuil || formData.cuit_cuil || "",
-          }
-        } else {
-          toast({ title: "Entidad requerida", description: "Debe seleccionar una entidad válida con CUIT/CUIL.", variant: "destructive" })
-          setLoading(false)
-          return
-        }
-        
-        // 2. Create payment record
-        const { data: paymentData, error: paymentError } = await supabase
-          .from("payment")
-          .insert([{ payment_type: formData.paymentType === "Otro" ? formData.customPaymentType : formData.paymentType }])
-          .select()
-          .single()
-        if (paymentError) throw paymentError
-
-        // 3. Create bill record
-        const { data: billData, error: billError } = await supabase
-          .from("bills")
-          .insert([{
-            bill_number: formData.billNumber || `AUTO-${Date.now()}`,
-            bill_date: formData.billDate,
-            bill_amount: formData.amount,
-            entity_id: entityData.id,
-          }])
-          .select()
-          .single()
-        if (billError) {
-          if (billError.code === "23505" && billError.message.includes("Bills_bill_number_key")) {
-            setBillNumberError("Este número de factura ya existe. Por favor, ingrese uno diferente.")
-            toast({ title: "Error de validación", description: "Este número de factura ya existe. Por favor, ingrese uno diferente.", variant: "destructive" })
-            setLoading(false); return
-          }
-          throw billError
-        }
-
-        // 4. Category
-        let categoryData
-        // First, check if the category exists
-        const { data: existingCategories, error: categoryFetchError } = await supabase
-          .from("category")
-          .select("*")
-          .ilike("description", formData.category.toUpperCase())
-          .limit(1)
-
-        if (categoryFetchError) throw categoryFetchError
-
-        if (existingCategories && existingCategories.length > 0) {
-          // Category exists, use it
-          categoryData = existingCategories[0]
-        } else {
-          // Category doesn't exist, create it
-          const { data: newCategory, error: categoryInsertError } = await supabase
-            .from("category")
-            .insert([{ description: formData.category.toUpperCase() }])
-            .select()
-            .single()
-
-          if (categoryInsertError) throw categoryInsertError
-          categoryData = newCategory
-        }
-
-        // 5. Check if subcategory exists and get or create it
-        let subcategoryData
-        // First, check if the subcategory exists
-        const { data: existingSubcategories, error: subcategoryFetchError } = await supabase
-          .from("sub_category")
-          .select("*")
-          .ilike("description", formData.subCategory.toUpperCase())
-          .eq("category_id", categoryData.id)
-          .limit(1)
-
-        if (subcategoryFetchError) throw subcategoryFetchError
-
-        if (existingSubcategories && existingSubcategories.length > 0) {
-          // Subcategory exists, use it
-          subcategoryData = existingSubcategories[0]
-        } else {
-          // Subcategory doesn't exist, create it
-          const { data: newSubcategory, error: subcategoryInsertError } = await supabase
-            .from("sub_category")
-            .insert([{ description: formData.subCategory.toUpperCase(), category_id: categoryData.id }])
-            .select()
-            .single()
-
-          if (subcategoryInsertError) throw subcategoryInsertError
-          subcategoryData = newSubcategory
-        }
-
-        // 6. Create operation record
-        const { data: operationData, error: operationError } = await supabase
-          .from("operations")
-          .insert([{ payment_id: paymentData.id, bill_id: billData.id }])
-          .select()
-          .single()
-        if (operationError) throw operationError
-
-        // 7. Create movement record with the new tax payment fields
-        const { data: movementData, error: movementError } = await supabase
-          .from("movements")
-          .insert([
-            {
-              description: formData.description,
-              movement_type: formData.movementType,
-              operation_id: operationData.id,
-              sub_category_id: subcategoryData.id,
-              created_by: currentUser.id,
-              is_tax_payment: formData.isTaxPayment,
-              related_tax_id: formData.isTaxPayment ? formData.relatedTaxId : null,
-              check: formData.check,
-            },
-          ])
-          .select()
-          .single()
-
-        if (movementError) throw movementError
-
-        // 8. Create movement_taxes records
-        if (formData.selectedTaxes.length > 0) {
-          const movementTaxesData = formData.selectedTaxes.map((tax: Tax) => ({
-            movement_id: movementData.id,
-            tax_id: tax.id,
-            calculated_amount: (formData.amount * tax.percentage) / 100,
-          }))
-
-          const { error: taxError } = await supabase.from("movement_taxes").insert(movementTaxesData)
-
-          if (taxError) throw taxError
-        }
-
-          // Mostrar mensaje de éxito
-          toast({
-            title: "¡Movimiento registrado con éxito!",
-            description: `Se ha registrado correctamente el movimiento por $${formData.amount.toFixed(2)}`,
-            type: "success",
-          })
-        }
     } catch (error: any) {
-      console.error("Error creating movement:", error)
+      console.error("Error creating movement:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo crear el movimiento",
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-
-    // Only reset the form and close the dialog if there were no validation errors
     if (!cuitCuilError && !billNumberError) {
-      resetForm()
-      setTimeout(() => { onOpenChange(false) }, 500)
+      resetForm();
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 500);
     }
   }
   const handleTaxCreated = async (taxName: string, percentage: number) => {
@@ -668,6 +373,10 @@ export function MovementForm({
 
   // Mover isFormValid aquí para acceder a formData
   const isFormValid = () => {
+    // En edición, permitir que los datos de entidad vengan de existingData si no se modificaron
+    const entityName = formData.entityName || (isEditMode && existingData && (existingData.empresa || (existingData.entity && existingData.entity.nombre))) || "";
+    const entityId = formData.entityId || (isEditMode && existingData && (existingData.entityId || (existingData.entity && existingData.entity.id))) || "";
+    const entityCuitCuil = formData.entityCuitCuil || (isEditMode && existingData && (existingData.entityCuitCuil || existingData.cuit_cuil || (existingData.entity && existingData.entity.cuit_cuil))) || "";
     return (
       formData.description.trim() &&
       formData.amount && Number(formData.amount) > 0 &&
@@ -677,8 +386,9 @@ export function MovementForm({
       formData.subCategory.trim() &&
       formData.billNumber.trim() &&
       formData.billDate &&
-      formData.entityName.trim() &&
-      formData.entityId
+      entityName.trim() &&
+      entityId &&
+      entityCuitCuil // <-- ahora es obligatorio
     );
   };
 
@@ -1024,8 +734,7 @@ export function MovementForm({
               ...prev,
               entityName: entity.nombre,
               entityId: entity.id,
-              cuit_cuil: entity.cuit_cuil,
-              entityCuitCuil: entity.cuit_cuil, // para compatibilidad
+              entityCuitCuil: entity.cuit_cuil, // solo este campo
             }))
             setEntitySelectorOpen(false)
           }}
@@ -1046,8 +755,7 @@ export function MovementForm({
                 ...prev,
                 entityName: entity.nombre,
                 entityId: entity.id,
-                cuit_cuil: entity.cuit_cuil,
-                entityCuitCuil: entity.cuit_cuil, 
+                entityCuitCuil: entity.cuit_cuil, // solo este campo
               }))
               setEntityFormOpen(false)
             } catch (error) {

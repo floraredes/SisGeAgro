@@ -40,9 +40,9 @@ export default function DashboardLayout({
         const user = data.session.user
         setUserId(user.id)
 
-        // Obtener el nombre desde la tabla unificada `users`
+        // Obtener el nombre desde la tabla unificada `profiles`
         const { data: userProfile, error: profileError } = await supabase
-          .from("users")
+          .from("profiles")
           .select("username")
           .eq("id", user.id)
           .single()

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/supabaseClient"
-import LoginForm from "@/components/login-form"
 
 export default function HomePage() {
   const router = useRouter()
@@ -16,11 +15,11 @@ export default function HomePage() {
 
         if (sessionError || !sessionData.session) {
           setCheckingSession(false)
+          router.replace("/auth")
           return
         }
 
         const userId = sessionData.session.user.id
-
         const { data: userProfile, error: userError } = await supabase
           .from("users")
           .select("id, role")
@@ -29,18 +28,21 @@ export default function HomePage() {
 
         if (userError || !userProfile) {
           await supabase.auth.signOut()
-          router.push("/auth")
+          setCheckingSession(false)
+          router.replace("/auth")
           return
         }
 
+        setCheckingSession(false)
         if (userProfile.role === "admin") {
-          router.push("/dashboard")
+          router.replace("/dashboard")
         } else {
-          router.push("/user-movement")
+          router.replace("/user-movement")
         }
       } catch (error) {
         console.error("Error verificando sesión:", error)
-        router.push("/auth")
+        setCheckingSession(false)
+        router.replace("/auth")
       }
     }
 
@@ -58,11 +60,5 @@ export default function HomePage() {
     )
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#e6eee0]">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
-        <LoginForm />
-      </div>
-    </div>
-  )
+  return null
 }

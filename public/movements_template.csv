@@ -1,2 +1,2 @@
-description;movementType;paymentType;customPaymentType;amount;category;subCategory;billNumber;billDate;entityName;entityCuitCuil;selectedTaxes;isTaxPayment;relatedTaxId;check
+description;movementType;paymentType;customPaymentType;amount;category;subCategory;billNumber;billDate;entityName;entityCuitCuil;selectedTaxes;selectedTaxesPercetages;isTaxPayment;relatedTaxId;check
 ;;;;;;;;;;;;;;

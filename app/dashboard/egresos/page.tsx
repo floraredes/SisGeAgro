@@ -147,24 +147,11 @@ export default function EgresosPage() {
                   <LineChart data={expenseData} margin={{ top: 20, right: 30, left: 50, bottom: 60 }}>
                     <XAxis dataKey="day" label={{ value: "Día del mes", position: "insideBottom", offset: -25 }} />
                     <YAxis
-                      yAxisId="left"
                       label={{
-                        value: `Monto Acumulado (${getCurrencySymbol()})`,
+                        value: `Monto (${getCurrencySymbol()})`,
                         angle: -90,
                         position: "insideLeft",
                         offset: -30,
-                      }}
-                      tickFormatter={formatYAxisTick}
-                      width={80}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{
-                        value: `Monto Diario (${getCurrencySymbol()})`,
-                        angle: 90,
-                        position: "insideRight",
-                        offset: -35,
                       }}
                       tickFormatter={formatYAxisTick}
                       width={80}
@@ -184,9 +171,8 @@ export default function EgresosPage() {
                       name="Egresos Acumulados"
                       stroke="#f87171"
                       strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      yAxisId="left"
+                      dot={false}
+                      activeDot={false}
                     />
                     <Line
                       type="monotone"
@@ -194,9 +180,8 @@ export default function EgresosPage() {
                       name="Egresos del Día"
                       stroke="#fb923c"
                       strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      yAxisId="right"
+                      dot={false}
+                      activeDot={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>

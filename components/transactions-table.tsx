@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,8 +25,6 @@ import { useToast } from "@/components/ui/simple-toast"
 import Papa from "papaparse"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { createMovement } from "@/lib/create-movement"
-
-// Importar el hook useCurrency
 import { useCurrency } from "@/contexts/currency-context"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -85,12 +82,12 @@ export function TransactionsTable({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
-
+  
   // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 10
-
+  
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState("")
   const [movementTypeFilter, setMovementTypeFilter] = useState<string>(movementType !== "all" ? movementType : "all")
@@ -98,46 +95,63 @@ export function TransactionsTable({
   const [subcategoryFilter, setSubcategoryFilter] = useState<string>("all")
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all")
   const [entityFilter, setEntityFilter] = useState<string>("all")
-
+  
   // Estados para opciones de visualización
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     ALL_COLUMNS.filter((col) => movementType === "all" || col.id !== "movimiento") // Ocultar columna de movimiento si es específico
-      .map((col) => col.id),
+    .map((col) => col.id),
   )
-
+  
   // Estados para datos de filtros
   const [categories, setCategories] = useState<{ id: string; description: string }[]>([])
   const [subcategories, setSubcategories] = useState<{ id: string; description: string; category_id: string }[]>([])
   const [paymentTypes, setPaymentTypes] = useState<string[]>([])
   const [entities, setEntities] = useState<{ id: string; nombre: string }[]>([])
-
+  
   // Estado para el formulario de movimientos
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-
+  
   // Estados para diálogos de edición y eliminación
   const [selectedMovement, setSelectedMovement] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-
+  
   // Estado para el menú contextual
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
     show: boolean
   } | null>(null)
-
+  
   // Estado para el diálogo de importación CSV
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importErrors, setImportErrors] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
-
+  
+  // Estado para el usuario logueado
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  
+  
   // Cargar datos iniciales
   useEffect(() => {
     fetchFilterOptions()
     fetchTransactions()
   }, [movementTypeFilter]) // Solo recargamos cuando cambia el tipo de movimiento
+
+  // Obtener el usuario logueado al montar el componente
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        setCurrentUser(null);
+        return;
+      }
+      setCurrentUser(data.user);
+    };
+    getCurrentUser();
+  }, []);
 
   // Aplicar filtros en el lado del cliente
   useEffect(() => {
@@ -278,7 +292,7 @@ export function TransactionsTable({
         sub_category_id,
         created_by,
         check,
-        operations:operation_id (
+        operations (
           id,
           payment_id,
           bill_id,
@@ -496,90 +510,81 @@ export function TransactionsTable({
 
   // Nueva función para manejar el archivo CSV
   const handleCSVImport = async (file: File) => {
+    if (!currentUser || !currentUser.id) {
+      setImportErrors(["No se detectó un usuario logueado. Por favor, recarga la página o vuelve a iniciar sesión."]);
+      setImporting(false);
+      return;
+    }
     setImporting(true)
     setImportErrors([])
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      delimiter: ";", // <-- Ajusta el delimitador si tu CSV usa punto y coma
+      delimiter: ";",
       complete: async (results) => {
         const rows = results.data as any[]
-        let errors: string[] = []
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i]
-          // Permite ambos sets de nombres de columnas
-          const description = row["description"] || row["detalle"] || ""
-          const movementType = (row["movementType"] || row["movimiento"] || "").toLowerCase()
-          const paymentType = row["paymentType"] || row["formaPago"] || ""
-          const customPaymentType = row["customPaymentType"] || ""
-          const amount = Number(row["amount"] || row["importe"] || 0)
-          const category = row["category"] || row["rubro"] || ""
-          const subCategory = row["subCategory"] || row["subrubro"] || ""
-          const billNumber = row["billNumber"] || row["factura"] || ""
-          const billDate = row["billDate"] || row["fechaComprobante"] || ""
-          const entityName = row["entityName"] || row["empresa"] || ""
-          const entityCuitCuil = row["entityCuitCuil"] || row["cuit_cuil"] || ""
-          const isTaxPayment = (row["isTaxPayment"] || "").toString().toLowerCase() === "true"
-          const relatedTaxId = row["relatedTaxId"] ? Number(row["relatedTaxId"]) : null
-          const check = (row["check"] || "").toString().toLowerCase() === "true"
-
-          // Validaciones previas
-          if (!description || !movementType || !paymentType || !amount || !category || !subCategory || !billNumber || !billDate || !entityName) {
-            errors.push(`Fila ${i + 2}: Faltan campos obligatorios.`)
-            continue
+        console.log("[IMPORT BULK] Claves del primer row:", Object.keys(rows[0]));
+        // Preprocesar fechas y limpiar datos como antes
+        const processedRows = rows.map((row) => {
+          let billDate = row["billDate"] || row["fechaComprobante"] || ""
+          if (/^\d{2}-\d{2}-\d{4}$/.test(billDate)) {
+            const [day, month, year] = billDate.split("-")
+            billDate = `${year}-${month}-${day}`
+          } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(billDate)) {
+            const [day, month, year] = billDate.split("/")
+            billDate = `${year}-${month}-${day}`
           }
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(billDate)) {
-            errors.push(`Fila ${i + 2}: La fecha debe estar en formato YYYY-MM-DD.`)
-            continue
+          return {
+            description: row["description"] || row["detalle"] || "",
+            movementType: (row["movementType"] || row["movimiento"] || "").toLowerCase(),
+            paymentType: row["paymentType"] || row["formaPago"] || "",
+            customPaymentType: row["customPaymentType"] || "",
+            amount: Number(row["amount"] || row["importe"] || 0),
+            category: row["category"] || row["rubro"] || "",
+            subCategory: row["subCategory"] || row["subrubro"] || "",
+            billNumber: row["billNumber"] || row["factura"] || "",
+            billDate,
+            entityName: row["entityName"] || row["empresa"] || "",
+            entityCuitCuil: row["entityCuitCuil"] || row["cuit_cuil"] || "",
+            selectedTaxes: row["selectedTaxes"] || "",
+            selectedTaxesPercentages: row["selectedTaxesPercentages"] || "", // Si tienes porcentajes de impuestos, mapea aquí
+            isTaxPayment: (row["isTaxPayment"] || "").toString().toLowerCase() === "true",
+            relatedTaxId: row["relatedTaxId"] ? Number(row["relatedTaxId"]) : null,
+            check: (row["check"] || "").toString().toLowerCase() === "true",
           }
-          if (isNaN(amount) || amount <= 0) {
-            errors.push(`Fila ${i + 2}: El importe debe ser un número mayor a 0.`)
-            continue
-          }
-          if (!["ingreso", "egreso", "inversión"].includes(movementType)) {
-            errors.push(`Fila ${i + 2}: El tipo de movimiento debe ser ingreso, egreso o inversión.`)
-            continue
-          }
-
-          try {
-            await createMovement(
-              {
-                description,
-                movementType,
-                paymentType,
-                customPaymentType,
-                amount,
-                category,
-                subCategory,
-                billNumber,
-                billDate,
-                entityName,
-                entityCuitCuil,
-                selectedTaxes: [], // Si tienes impuestos, mapea aquí
-                isTaxPayment,
-                relatedTaxId,
-                check,
-              },
-              "admin", // Reemplaza por el userId real si lo tienes
-              supabase
-            )
-          } catch (err: any) {
-            errors.push(`Fila ${i + 2}: ${err.message || "Error desconocido"}`)
-          }
-        }
-        setImportErrors(errors)
-        setImporting(false)
-        if (errors.length === 0) {
-          setShowImportDialog(false)
-          toast({
-            title: "Importación exitosa",
-            description: "Todos los movimientos fueron importados correctamente.",
-            type: "success",
+        })
+        // Llama a la API en vez de createMovement uno a uno
+        //Obtener sesion
+        try {
+          //llamada a la api
+          const res = await fetch("/api/import-csv", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: processedRows, userId: currentUser?.id }),
           })
-          fetchTransactions()
+
+          const data = await res.json()
+          if (data.results) {
+            const errors = data.results.filter((r: any) => !r.success).map((r: any) => `Fila ${r.row}: ${r.error}`)
+            setImportErrors(errors)
+            if (errors.length === 0) {
+              setShowImportDialog(false)
+              toast({
+                title: "Importación exitosa",
+                description: "Todos los movimientos fueron importados correctamente.",
+                type: "success",
+              })
+              fetchTransactions()
+            }
+          } else if (data.error) {
+            setImportErrors([data.error])
+          }
+        } catch (err: any) {
+          setImportErrors([err.message || "Error inesperado"])
         }
+        setImporting(false)
       },
-      error: (err) => {
+      error: (err: any) => {
         setImportErrors([err.message])
         setImporting(false)
       },

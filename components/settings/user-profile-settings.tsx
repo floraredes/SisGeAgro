@@ -40,6 +40,15 @@ export function UserProfileSettings({ userProfile }: UserProfileSettingsProps) {
   const [profileError, setProfileError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
 
+  // Nueva función para enviar email de recuperación de contraseña
+  const [isSendingReset, setIsSendingReset] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+
+  // Estados para cambio de email
+  const [newEmail, setNewEmail] = useState("")
+  const [isSendingEmailChange, setIsSendingEmailChange] = useState(false)
+  const [emailChangeError, setEmailChangeError] = useState<string | null>(null)
+
   // Cargar datos del usuario cuando se recibe el prop
   useEffect(() => {
     if (userProfile) {
@@ -157,6 +166,60 @@ export function UserProfileSettings({ userProfile }: UserProfileSettingsProps) {
     }
   }
 
+  // Nueva función para enviar email de recuperación de contraseña
+  const handleSendResetPassword = async () => {
+    setIsSendingReset(true)
+    setResetError(null)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(personalInfo.email)
+      if (error) throw error
+      toast({
+        title: "Email enviado",
+        description: "Revisa tu correo para cambiar tu contraseña.",
+        type: "success",
+      })
+    } catch (error: any) {
+      setResetError(error.message || "No se pudo enviar el email de recuperación")
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el email de recuperación",
+        type: "error",
+      })
+    } finally {
+      setIsSendingReset(false)
+    }
+  }
+
+  // Función para solicitar cambio de email
+  const handleSendEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSendingEmailChange(true)
+    setEmailChangeError(null)
+    try {
+      if (!newEmail.trim()) {
+        setEmailChangeError("Debes ingresar un nuevo email")
+        return
+      }
+      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
+      if (error) throw error
+      toast({
+        title: "Solicitud enviada",
+        description: "Revisa tu nuevo correo para confirmar el cambio.",
+        type: "success",
+      })
+      setNewEmail("")
+    } catch (error: any) {
+      setEmailChangeError(error.message || "No se pudo solicitar el cambio de email")
+      toast({
+        title: "Error",
+        description: "No se pudo solicitar el cambio de email",
+        type: "error",
+      })
+    } finally {
+      setIsSendingEmailChange(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Información Personal */}
@@ -176,7 +239,6 @@ export function UserProfileSettings({ userProfile }: UserProfileSettingsProps) {
                 <AlertDescription className="text-red-800">{profileError}</AlertDescription>
               </Alert>
             )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Nombre de Usuario</Label>
@@ -187,32 +249,48 @@ export function UserProfileSettings({ userProfile }: UserProfileSettingsProps) {
                   placeholder="Ingresa tu nombre de usuario"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={personalInfo.email}
-                  disabled
-                  className="bg-gray-50"
-                  placeholder="Email no editable"
-                />
-                <p className="text-xs text-muted-foreground">El email no se puede modificar desde aquí</p>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="role">Rol</Label>
                 <Input id="role" value={personalInfo.role} disabled className="bg-gray-50" placeholder="Rol asignado" />
                 <p className="text-xs text-muted-foreground">El rol es asignado por un administrador</p>
               </div>
             </div>
-
             <div className="flex justify-end">
               <Button type="submit" disabled={isUpdatingProfile} className="bg-[#4F7942] hover:bg-[#3d5f35]">
                 {isUpdatingProfile ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </div>
+          </form>
+          <Separator className="my-6" />
+          {/* Cambiar Email */}
+          <form onSubmit={handleSendEmailChange} className="space-y-2">
+            <Label htmlFor="new-email">Nuevo Email</Label>
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <Input
+                id="new-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Ingresa tu nuevo email"
+                className="md:w-1/2"
+              />
+              <Button
+                type="submit"
+                disabled={isSendingEmailChange}
+                className="bg-[#4F7942] hover:bg-[#3d5f35] md:w-auto"
+              >
+                {isSendingEmailChange ? "Enviando..." : "Solicitar cambio de email"}
+              </Button>
+            </div>
+            {emailChangeError && (
+              <Alert className="border-red-200 bg-red-50 mt-2">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">{emailChangeError}</AlertDescription>
+              </Alert>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Recibirás un enlace en tu nuevo correo para confirmar el cambio. Debes hacer clic en ese enlace para completar el proceso.
+            </p>
           </form>
         </CardContent>
       </Card>
@@ -226,58 +304,37 @@ export function UserProfileSettings({ userProfile }: UserProfileSettingsProps) {
             <Lock className="h-5 w-5" />
             Cambiar Contraseña
           </CardTitle>
-          <CardDescription>Actualiza tu contraseña para mantener tu cuenta segura</CardDescription>
+          <CardDescription>
+            Recibirás un email para cambiar tu contraseña de forma segura
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            {passwordError && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">{passwordError}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Contraseña Actual</Label>
-                <Input
-                  id="currentPassword"
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                  placeholder="Ingresa tu contraseña actual"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))}
-                  placeholder="Ingresa tu nueva contraseña"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                  placeholder="Confirma tu nueva contraseña"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isUpdatingPassword} className="bg-[#4F7942] hover:bg-[#3d5f35]">
-                {isUpdatingPassword ? "Cambiando..." : "Cambiar Contraseña"}
-              </Button>
-            </div>
-          </form>
+          {resetError && (
+            <Alert className="border-red-200 bg-red-50 mb-4">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">{resetError}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <Input
+              id="reset-email"
+              type="email"
+              value={personalInfo.email}
+              disabled
+              className="bg-gray-50 md:w-1/2"
+              placeholder="Email no editable"
+            />
+            <Button
+              onClick={handleSendResetPassword}
+              disabled={isSendingReset}
+              className="bg-[#4F7942] hover:bg-[#3d5f35] md:w-auto"
+            >
+              {isSendingReset ? "Enviando..." : "Enviar email para cambiar contraseña"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Recibirás un enlace en tu correo para cambiar la contraseña. Si no lo ves, revisa la carpeta de spam.
+          </p>
         </CardContent>
       </Card>
     </div>

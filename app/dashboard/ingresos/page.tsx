@@ -147,49 +147,14 @@ export default function IngresosPage() {
                   <LineChart data={incomeData} margin={{ top: 20, right: 30, left: 50, bottom: 60 }}>
                     <XAxis dataKey="day" label={{ value: "Día del mes", position: "insideBottom", offset: -25 }} />
                     <YAxis
-                      yAxisId="left"
                       label={{
-                        value: `Monto Acumulado (${getCurrencySymbol()})`,
+                        value: `Monto (${getCurrencySymbol()})`,
                         angle: -90,
                         position: "insideLeft",
-                        offset: -35,
+                        offset: -30,
                       }}
                       tickFormatter={formatYAxisTick}
                       width={80}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{
-                        value: `Monto Diario (${getCurrencySymbol()})`,
-                        angle: 90,
-                        position: "insideRight",
-                        offset: -35,
-                      }}
-                      tickFormatter={formatYAxisTick}
-                      width={80}
-                    />
-
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <Line
-                      type="monotone"
-                      dataKey="ingresos"
-                      name="Ingresos Acumulados"
-                      stroke="#4ade80"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      yAxisId="left"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="ingresosDelDia"
-                      name="Ingresos del Día"
-                      stroke="#60a5fa"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      yAxisId="right"
                     />
                     <Tooltip
                       formatter={(value: number, name: string) => {
@@ -198,6 +163,25 @@ export default function IngresosPage() {
                         return [formatCurrency(value), name]
                       }}
                       labelFormatter={(label) => `Día ${label}`}
+                    />
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <Line
+                      type="monotone"
+                      dataKey="ingresos"
+                      name="Ingresos Acumulados"
+                      stroke="#34d399"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ingresosDelDia"
+                      name="Ingresos del Día"
+                      stroke="#60a5fa"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>

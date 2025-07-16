@@ -186,6 +186,8 @@ const handleAddUser = async (e: React.FormEvent) => {
       body: JSON.stringify({
         email: newUser.email,
         password: newUser.password,
+        username: newUser.username,
+        role: newUser.role,
       }),
     })
 
