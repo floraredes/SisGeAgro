@@ -53,6 +53,12 @@ SIS-GE-AGRO es una plataforma web para la gestión financiera y administrativa d
      NEXT_PUBLIC_SUPABASE_URL=tu_url_supabase
      SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
      NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
+<<<<<<< HEAD
+=======
+     GMAIL_USER= your_gmail
+     GMAIL_PASS= your_gmail_pass
+
+>>>>>>> e5652f7169f0f0d9e2c1d13e32ef453e02fd5386
      ```
 4. **Ejecuta el proyecto:**
    ```bash
@@ -99,6 +105,7 @@ public/         # Recursos estáticos
 
 ---
 
+<<<<<<< HEAD
 ## Licencia
 
 MIT
@@ -108,3 +115,6 @@ MIT
 ## Autor
 
 - [Tu Nombre o Equipo](https://github.com/tu-usuario)
+=======
+
+>>>>>>> e5652f7169f0f0d9e2c1d13e32ef453e02fd5386
