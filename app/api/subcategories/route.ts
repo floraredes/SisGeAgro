@@ -9,18 +9,26 @@ const supabaseAdmin = createClient(
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
-      .from("entity")
-      .select("*")
-      .order("nombre")
+      .from("sub_category")
+      .select(`
+        id,
+        description,
+        category_id,
+        categories:category_id (
+          id,
+          description
+        )
+      `)
+      .order("description")
 
     if (error) {
-      console.error("Error fetching entities:", error)
-      return NextResponse.json({ error: "Error al obtener entidades" }, { status: 500 })
+      console.error("Error fetching subcategories:", error)
+      return NextResponse.json({ error: "Error al obtener subcategorías" }, { status: 500 })
     }
 
     return NextResponse.json({ data })
   } catch (error) {
-    console.error("Error in entities API:", error)
+    console.error("Error in subcategories API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
-}
+} 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowDown, DollarSign, Receipt, TrendingDown, TrendingUp, ArrowLeftRight } from "lucide-react"
-import { supabase } from "@/lib/supabase/supabaseClient"
+import { getDashboardStats } from "@/lib/api-utils"
 import { useCurrency } from "@/contexts/currency-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,33 +54,8 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
     async function fetchMovements() {
       setLoading(true)
       try {
-        const year = new Date().getFullYear()
-        const yearStart = `${year}-01-01`
-        const yearEnd = `${year}-12-31`
-        const { data, error } = await supabase
-          .from("movements")
-          .select(`
-            movement_type,
-            description,
-            sub_category_id,
-            operations:operation_id (
-              bills:bill_id (
-                bill_amount,
-                bill_date
-              )
-            ),
-            movement_taxes (
-              calculated_amount
-            ),
-            sub_categories:sub_category_id (
-              categories:category_id (
-                description
-              )
-            )
-          `)
-          .gte("operations.bills.bill_date", yearStart)
-          .lte("operations.bills.bill_date", yearEnd)
-        if (error) throw error
+        // Usar las nuevas utilidades que manejan ambos tipos de usuarios
+        const data = await getDashboardStats(startDate, endDate)
         setMovements(data || [])
       } catch (error) {
         console.error("Error fetching movements:", error)
@@ -89,7 +64,7 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
       }
     }
     fetchMovements()
-  }, [])
+  }, [startDate, endDate])
 
   // --- Utilidades de procesamiento ---
   function filterMovementsByDate(movs: any[], start: string, end: string) {

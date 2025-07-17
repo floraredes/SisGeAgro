@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import { getMovements, getCategories, getSubcategories, getEntities, getPaymentTypes } from "@/lib/api-utils"
 import { MovementForm } from "./movement-form"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
@@ -235,42 +236,18 @@ export function TransactionsTable({
   // Función para obtener opciones de filtros
   const fetchFilterOptions = async () => {
     try {
-      // Obtener categorías
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("category")
-        .select("id, description")
-        .order("description")
+      // Usar las nuevas API routes que manejan ambos tipos de usuarios
+      const [categoriesData, subcategoriesData, entitiesData, paymentTypesData] = await Promise.all([
+        getCategories(),
+        getSubcategories(),
+        getEntities(),
+        getPaymentTypes()
+      ])
 
-      if (categoriesError) throw categoriesError
       setCategories(categoriesData || [])
-
-      // Obtener subcategorías
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from("sub_category")
-        .select("id, description, category_id")
-        .order("description")
-
-      if (subcategoriesError) throw subcategoriesError
       setSubcategories(subcategoriesData || [])
-
-      // Obtener tipos de pago únicos
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from("payment")
-        .select("payment_type")
-        .order("payment_type")
-
-      if (paymentsError) throw paymentsError
-      const uniquePaymentTypes = [...new Set(paymentsData?.map((p) => p.payment_type) || [])]
-      setPaymentTypes(uniquePaymentTypes)
-
-      // Obtener entidades
-      const { data: entitiesData, error: entitiesError } = await supabase
-        .from("entity")
-        .select("id, nombre")
-        .order("nombre")
-
-      if (entitiesError) throw entitiesError
       setEntities(entitiesData || [])
+      setPaymentTypes(paymentTypesData || [])
     } catch (error) {
       console.error("Error al cargar opciones de filtros:", error)
       setError("No se pudieron cargar las opciones de filtros")
@@ -281,107 +258,41 @@ export function TransactionsTable({
   const fetchTransactions = async () => {
     setLoading(true)
     try {
-      // Construir la consulta base
-      let query = supabase
-        .from("movements")
-        .select(`
-        id,
-        description,
-        movement_type,
-        operation_id,
-        sub_category_id,
-        created_by,
-        check,
-        operations (
-          id,
-          payment_id,
-          bill_id,
-          payments:payment_id (
-            id,
-            payment_type
-          ),
-          bills:bill_id (
-            id,
-            bill_number,
-            bill_date,
-            bill_amount,
-            entity_id,
-            entity:entity_id (
-              id,
-              nombre
-            )
-          )
-        ),
-        sub_categories:sub_category_id (
-          id,
-          description,
-          category_id,
-          categories:category_id (
-            id,
-            description
-          )
-        ),
-        movement_taxes (
-          id,
-          tax_id,
-          calculated_amount,
-          taxes:tax_id (
-            id,
-            name,
-            percentage
-          )
-        )
-      `)
-        .order("id", { ascending: false })
+      // Usar las nuevas utilidades que manejan ambos tipos de usuarios
+      let data = await getMovements(movementType !== "all" ? movementType : movementTypeFilter)
 
       // Aplicar filtro de tipo de movimiento si es necesario
-      if (movementType !== "all") {
-        query = query.eq("movement_type", movementType)
-      } else if (movementTypeFilter && movementTypeFilter !== "all") {
-        query = query.eq("movement_type", movementTypeFilter)
+      if (movementType !== "all" && movementTypeFilter !== "all") {
+        data = data.filter((item: any) => item.movement_type === movementTypeFilter)
       }
 
-      // Ejecutar la consulta
-      const { data, error } = await query
+      if (data) {
+        // Transformar los datos al formato esperado
+        const transformedData = data.map((item: any) => ({
+          id: item.id,
+          detalle: item.description,
+          empresa: item.operations?.bills?.entity?.nombre || "N/A",
+          formaPago: item.operations?.payments?.payment_type || "N/A",
+          fechaComprobante: item.operations?.bills?.bill_date || "N/A",
+          factura: item.operations?.bills?.bill_number || "N/A",
+          movimiento: item.movement_type,
+          rubro: item.sub_categories?.categories?.description || "N/A",
+          subrubro: item.sub_categories?.description || "N/A",
+          importe: item.operations?.bills?.bill_amount || 0,
+          percepcion: item.movement_taxes?.reduce((sum: number, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0,
+          categoryId: item.sub_categories?.category_id,
+          subcategoryId: item.sub_category_id,
+          entityId: item.operations?.bills?.entity_id,
+          check: item.check || false,
+        }))
 
-      if (error) throw error
-
-      // Transformar los datos para la tabla
-      const formattedData: Transaction[] =
-        data?.map((item) => {
-          // Calcular la suma de los impuestos
-          const percepcion = item.movement_taxes?.reduce((sum, tax) => sum + (tax.calculated_amount || 0), 0) || 0
-
-          return {
-            id: item.id,
-            detalle: item.description || "",
-            empresa: item.operations?.bills?.entity?.nombre || "",
-            formaPago: item.operations?.payments?.payment_type || "",
-            fechaComprobante: item.operations?.bills?.bill_date || "",
-            factura: item.operations?.bills?.bill_number || "",
-            movimiento: item.movement_type as "ingreso" | "egreso" | "inversión",
-            rubro: item.sub_categories?.categories?.description || "",
-            subrubro: item.sub_categories?.description || "",
-            importe: item.operations?.bills?.bill_amount || 0,
-            percepcion: percepcion,
-            // Guardamos los IDs para filtrar después
-            categoryId: item.sub_categories?.category_id,
-            subcategoryId: item.sub_category_id,
-            entityId: item.operations?.bills?.entity_id,
-            check: item.check || false,
-          }
-        }) || []
-
-      // Guardar todos los datos sin filtrar
-      setAllTransactions(formattedData)
-
-      // Aplicar los filtros en el lado del cliente
-      // (esto se hará automáticamente por el useEffect)
+        setAllTransactions(transformedData)
+        setTransactions(transformedData)
+        setTotalItems(transformedData.length)
+      }
     } catch (error) {
-      console.error("Error al cargar transacciones:", error)
-      setError("No se pudieron cargar las transacciones")
-      setAllTransactions([])
-      setTransactions([])
+      console.error("Error fetching transactions:", error)
+      setError("Error al cargar las transacciones")
     } finally {
       setLoading(false)
     }
