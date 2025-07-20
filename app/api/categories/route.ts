@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ error: "Error al obtener categorías" }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ categories: data })
   } catch (error) {
     console.error("Error in categories API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })

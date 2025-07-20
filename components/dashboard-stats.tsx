@@ -68,7 +68,7 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
 
   // --- Utilidades de procesamiento ---
   function filterMovementsByDate(movs: any[], start: string, end: string) {
-    return movs.filter((movement) => {
+    const filtered = movs.filter((movement) => {
       let bills: any[] = []
       if (Array.isArray(movement.operations)) {
         movement.operations.forEach((op: any) => {
@@ -79,8 +79,10 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
       } else if ((movement.operations as any)?.bills) {
         bills = Array.isArray((movement.operations as any).bills) ? (movement.operations as any).bills : [(movement.operations as any).bills]
       }
-      return bills.some(b => b.bill_date && b.bill_date >= start && b.bill_date <= end)
+      const hasValidBill = bills.some(b => b.bill_date && b.bill_date >= start && b.bill_date <= end)
+      return hasValidBill
     })
+    return filtered
   }
   function getBillInRange(movement: any, start: string, end: string) {
     let bills: any[] = []
@@ -148,7 +150,9 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
   }
   function getExpensesByCategory(movs: any[], start: string, end: string) {
     const categoryTotals: Record<string, number> = {}
-    filterMovementsByDate(movs, start, end).forEach((movement) => {
+    const filteredMovements = filterMovementsByDate(movs, start, end)
+    
+    filteredMovements.forEach((movement) => {
       if (movement.movement_type !== "egreso") return
       const bill = getBillInRange(movement, start, end)
       if (!bill) return
@@ -157,10 +161,13 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
       if (!categoryTotals[categoryName]) categoryTotals[categoryName] = 0
       categoryTotals[categoryName] += amount
     })
-    return Object.entries(categoryTotals)
+    
+    const result = Object.entries(categoryTotals)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5)
+    
+    return result
   }
   function getIncomesByCategory(movs: any[], start: string, end: string) {
     const categoryTotals: Record<string, number> = {}

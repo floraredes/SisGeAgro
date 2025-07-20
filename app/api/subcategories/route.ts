@@ -26,7 +26,7 @@ export async function GET() {
       return NextResponse.json({ error: "Error al obtener subcategorías" }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ subcategories: data })
   } catch (error) {
     console.error("Error in subcategories API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })

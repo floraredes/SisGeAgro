@@ -1,28 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { Input } from "@/components/ui/input"
 
 
 export default function DashboardPage() {
-  // Calcular fechas por defecto
+  // Rango de fechas por defecto: últimos 30 días
   const today = new Date()
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-  // Leer de localStorage o usar por defecto
-  const [startDate, setStartDate] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("dashboardStartDate") || firstDay.toISOString().slice(0, 10)
-    }
-    return firstDay.toISOString().slice(0, 10)
-  })
-  const [endDate, setEndDate] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("dashboardEndDate") || lastDay.toISOString().slice(0, 10)
-    }
-    return lastDay.toISOString().slice(0, 10)
-  })
+  const thirtyDaysAgo = new Date(today)
+  thirtyDaysAgo.setDate(today.getDate() - 30)
+  const firstDay = thirtyDaysAgo
+  const lastDay = today
+  const [startDate, setStartDate] = useState<string>(firstDay.toISOString().slice(0, 10))
+  const [endDate, setEndDate] = useState<string>(lastDay.toISOString().slice(0, 10))
+
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
 
   return (
     <div className="p-6 bg-[#F5F6FA] min-w-0 flex flex-col">

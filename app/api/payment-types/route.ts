@@ -20,7 +20,7 @@ export async function GET() {
 
     const uniquePaymentTypes = [...new Set(data?.map((p) => p.payment_type) || [])]
 
-    return NextResponse.json({ data: uniquePaymentTypes })
+    return NextResponse.json({ paymentTypes: uniquePaymentTypes })
   } catch (error) {
     console.error("Error in payment-types API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })

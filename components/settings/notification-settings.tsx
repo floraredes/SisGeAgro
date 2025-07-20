@@ -48,25 +48,25 @@ export function NotificationSettings() {
 
         setUserId(currentUser.id)
 
-        // Obtener configuraciones de notificación de la base de datos
-        const { data, error } = await supabase
-          .from("notification_settings")
-          .select("*")
+          // Obtener configuraciones de notificación de la base de datos
+          const { data, error } = await supabase
+            .from("notification_settings")
+            .select("*")
           .eq("user_id", currentUser.id)
-          .single()
+            .single()
 
-        if (!error && data) {
-          setSettings({
-            emailNotifications: data.email_notifications || true,
-            appNotifications: data.app_notifications || true,
-            expenseThreshold: data.expense_threshold?.toString() || "5000",
-            notificationFrequency: data.notification_frequency || "daily",
-            newTransactionNotifications: data.new_transaction_notifications || true,
-            pendingApprovalNotifications: data.pending_approval_notifications || true,
-            systemUpdates: data.system_updates || false,
-          })
-        } else {
-          // Si no hay configuraciones, crear un registro por defecto
+          if (!error && data) {
+            setSettings({
+              emailNotifications: data.email_notifications || true,
+              appNotifications: data.app_notifications || true,
+              expenseThreshold: data.expense_threshold?.toString() || "5000",
+              notificationFrequency: data.notification_frequency || "daily",
+              newTransactionNotifications: data.new_transaction_notifications || true,
+              pendingApprovalNotifications: data.pending_approval_notifications || true,
+              systemUpdates: data.system_updates || false,
+            })
+          } else {
+            // Si no hay configuraciones, crear un registro por defecto
           try {
             const { error: insertError } = await supabase.from("notification_settings").insert({
               user_id: currentUser.id,

@@ -12,6 +12,8 @@ export interface MovementFormData {
   amount: number
   category: string
   subCategory: string
+  categoryText: string // Texto libre para categoría
+  subCategoryText: string // Texto libre para subcategoría
   billNumber: string
   billDate: string
   entityName: string
@@ -19,12 +21,8 @@ export interface MovementFormData {
   selectedTaxes: Tax[]
   // Nuevos campos para pagos de impuestos
   isTaxPayment: boolean
-<<<<<<< HEAD
-  relatedTaxId: string | null
-  check: boolean
-=======
   relatedTaxId: number | null // Cambiado de string a number para coincidir con BIGINT
->>>>>>> origin/main
+  check: boolean
 }
 
 export interface Tax {

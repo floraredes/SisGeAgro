@@ -2,10 +2,10 @@
 
 import { TransactionsTable } from "./transactions-table"
 
-export function ExpenseTable() {
+export function ExpenseTable({ movements }: { movements?: any[] }) {
   return (
     <div className="rounded-lg border bg-card p-6">
-      <TransactionsTable movementType="egreso" showMovementTypeFilter={false} title="Tabla de Egresos" />
+      <TransactionsTable movementType="egreso" showMovementTypeFilter={false} title="Tabla de Egresos" movements={movements} />
     </div>
   )
 }

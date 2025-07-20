@@ -19,6 +19,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { getMovements, getCategories, getSubcategories, getEntities, getPaymentTypes } from "@/lib/api-utils"
+import { getCurrentUser } from "@/lib/auth-utils"
 import { MovementForm } from "./movement-form"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
@@ -68,12 +69,16 @@ interface TransactionsTableProps {
   movementType?: "ingreso" | "egreso" | "inversión" | "all"
   showMovementTypeFilter?: boolean
   title?: string
+  movements?: any[]
+  user?: any
 }
 
 export function TransactionsTable({
   movementType = "all",
   showMovementTypeFilter = true,
   title,
+  movements,
+  user,
 }: TransactionsTableProps) {
   // Agregar el hook de moneda
   const { formatCurrency } = useCurrency()
@@ -138,21 +143,48 @@ export function TransactionsTable({
   // Cargar datos iniciales
   useEffect(() => {
     fetchFilterOptions()
-    fetchTransactions()
-  }, [movementTypeFilter]) // Solo recargamos cuando cambia el tipo de movimiento
+    if (movements) {
+      // Si se pasan movimientos como prop, usarlos directamente
+      // Transformar los datos al formato esperado
+      const transformedData = movements.map((item: any) => ({
+        id: item.id,
+        detalle: item.description,
+        empresa: item.operations?.bills?.entity?.nombre || "N/A",
+        formaPago: item.operations?.payments?.payment_type || "N/A",
+        fechaComprobante: item.operations?.bills?.bill_date || "N/A",
+        factura: item.operations?.bills?.bill_number || "N/A",
+        movimiento: item.movement_type,
+        rubro: item.sub_categories?.categories?.description || "N/A",
+        subrubro: item.sub_categories?.description || "N/A",
+        importe: item.operations?.bills?.bill_amount || 0,
+        percepcion: item.movement_taxes?.reduce((sum: number, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0,
+        categoryId: item.sub_categories?.category_id,
+        subcategoryId: item.sub_category_id,
+        entityId: item.operations?.bills?.entity_id,
+        check: item.check || false,
+      }))
+      setAllTransactions(transformedData)
+      setTransactions(transformedData)
+      setTotalItems(transformedData.length)
+      setLoading(false)
+    } else {
+      fetchTransactions()
+    }
+  }, [movementTypeFilter, movements]) // Solo recargamos cuando cambia el tipo de movimiento
 
   // Obtener el usuario logueado al montar el componente
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (error) {
-        setCurrentUser(null);
-        return;
+    const fetchCurrentUser = async () => {
+      try {
+        const currentUser = await getCurrentUser()
+        setCurrentUser(currentUser)
+      } catch (error) {
+        console.error("Error getting current user:", error)
+        setCurrentUser(null)
       }
-      setCurrentUser(data.user);
-    };
-    getCurrentUser();
-  }, []);
+    }
+    fetchCurrentUser()
+  }, [])
 
   // Aplicar filtros en el lado del cliente
   useEffect(() => {
@@ -266,10 +298,14 @@ export function TransactionsTable({
         data = data.filter((item: any) => item.movement_type === movementTypeFilter)
       }
 
+      if (movementType === "ingreso") {
+        // console.log("[Tabla de Ingresos] Datos recibidos:", data)
+      }
+
       if (data) {
         // Transformar los datos al formato esperado
         const transformedData = data.map((item: any) => ({
-          id: item.id,
+            id: item.id,
           detalle: item.description,
           empresa: item.operations?.bills?.entity?.nombre || "N/A",
           formaPago: item.operations?.payments?.payment_type || "N/A",
@@ -278,13 +314,17 @@ export function TransactionsTable({
           movimiento: item.movement_type,
           rubro: item.sub_categories?.categories?.description || "N/A",
           subrubro: item.sub_categories?.description || "N/A",
-          importe: item.operations?.bills?.bill_amount || 0,
+            importe: item.operations?.bills?.bill_amount || 0,
           percepcion: item.movement_taxes?.reduce((sum: number, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0,
-          categoryId: item.sub_categories?.category_id,
-          subcategoryId: item.sub_category_id,
-          entityId: item.operations?.bills?.entity_id,
-          check: item.check || false,
+            categoryId: item.sub_categories?.category_id,
+            subcategoryId: item.sub_category_id,
+            entityId: item.operations?.bills?.entity_id,
+            check: item.check || false,
         }))
+
+        if (movementType === "ingreso") {
+          // console.log("[Tabla de Ingresos] Datos transformados:", transformedData)
+        }
 
         setAllTransactions(transformedData)
         setTransactions(transformedData)
@@ -378,7 +418,7 @@ export function TransactionsTable({
 
   // Función para resetear filtros
   const resetFilters = () => {
-    setMovementTypeFilter("all")
+    setMovementTypeFilter(movementType !== "all" ? movementType : "all")
     setCategoryFilter("all")
     setSubcategoryFilter("all")
     setPaymentTypeFilter("all")

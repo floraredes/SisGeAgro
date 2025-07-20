@@ -32,7 +32,7 @@ export default function DashboardLayout({
         setLoading(true)
         
         const currentUser = await getCurrentUser()
-        
+
         if (!currentUser) {
           console.error("Usuario no autenticado")
           router.push("/auth")

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -10,12 +10,16 @@ import { useToast } from "@/components/ui/simple-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { TaxDialog } from "./tax-dialog"
 import { supabase } from "@/lib/supabase/supabaseClient"
+import { getCurrentUser } from "@/lib/auth-utils"
 import type { MovementFormData, Tax } from "@/types/forms"
 import { TaxSelection } from "./tax-selection"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { EntitySelector } from "./entity-selector"
 import { EntityForm } from "./entity-form"
+import { ChevronDown } from "lucide-react"
 
 const PAYMENT_TYPES = ["Efectivo", "Débito", "Crédito", "Transferencia", "Otro"]
 const MOVEMENT_TYPES = ["ingreso", "egreso", "inversión"]
@@ -48,6 +52,40 @@ export function MovementForm({
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [entitySelectorOpen, setEntitySelectorOpen] = useState(false)
   const [entityFormOpen, setEntityFormOpen] = useState(false)
+  const [categories, setCategories] = useState<{ id: string; name: string; description: string }[]>([])
+  const [subcategories, setSubcategories] = useState<{ id: string; name: string; description: string; category_id: string }[]>([])
+  const [filteredSubcategories, setFilteredSubcategories] = useState<{ id: string; name: string; description: string; category_id: string }[]>([])
+  const [filteredCategories, setFilteredCategories] = useState<{ id: string; name: string; description: string }[]>([])
+  const [searchableSubcategories, setSearchableSubcategories] = useState<{ id: string; name: string; description: string; category_id: string }[]>([])
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const [subcategoryOpen, setSubcategoryOpen] = useState(false)
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [newSubcategories, setNewSubcategories] = useState<string[]>([""]);
+  const [savingCategory, setSavingCategory] = useState(false);
+
+  // Estados para el modal de subrubros
+  const [showEditSubcategoryModal, setShowEditSubcategoryModal] = useState(false);
+  const [editSubcategories, setEditSubcategories] = useState<string[]>([]);
+  const [editSubcategoryIds, setEditSubcategoryIds] = useState<(string|null)[]>([]);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [savingSubcategories, setSavingSubcategories] = useState(false);
+
+  // Cerrar dropdowns cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.category-dropdown') && !target.closest('.subcategory-dropdown')) {
+        setCategoryOpen(false);
+        setSubcategoryOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   const [formData, setFormData] = useState<MovementFormData>({
     description: "",
     movementType: defaultMovementType || "ingreso",
@@ -100,10 +138,14 @@ export function MovementForm({
   useEffect(() => {
     if (open) {
       fetchTaxes()
+      fetchCategories()
+      fetchSubcategories()
       if (user) {
         setCurrentUser(user)
       } else {
-        getCurrentUser()
+        getCurrentUser().then(setCurrentUser).catch((error) => {
+          console.error("Error getting current user:", error)
+        })
       }
     }
     // eslint-disable-next-line
@@ -166,15 +208,6 @@ export function MovementForm({
     // eslint-disable-next-line
   }, [formData.isTaxPayment, formData.relatedTaxId, availableTaxes])
 
-  const getCurrentUser = async () => {
-    try {
-      const { data, error } = await supabase.auth.getUser()
-      if (error) throw error
-      setCurrentUser(data.user)
-    } catch (error) {
-      console.error("Error getting current user:", error)
-    }
-  }
   const fetchTaxes = async () => {
     if (isInternal) {
      // Usuarios internos: fetch a la API (usa service key)
@@ -188,6 +221,55 @@ export function MovementForm({
    }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data.categories || []);
+        setFilteredCategories(data.categories || []);
+      } else {
+        console.error('❌ [MovementForm] Error en fetchCategories - Status:', response.status)
+        const errorText = await response.text();
+        console.error('❌ [MovementForm] Error response:', errorText)
+      }
+    } catch (error) {
+      console.error('❌ [MovementForm] Error fetching categories:', error);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    try {
+      const response = await fetch('/api/subcategories');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSubcategories(data.subcategories || []);
+      } else {
+        console.error('❌ [MovementForm] Error en fetchSubcategories - Status:', response.status)
+        const errorText = await response.text();
+        console.error('❌ [MovementForm] Error response:', errorText)
+      }
+    } catch (error) {
+      console.error('❌ [MovementForm] Error fetching subcategories:', error);
+    }
+  };
+
+  // Filtrar subcategorías cuando cambia la categoría seleccionada
+  useEffect(() => {
+    if (formData.category) {
+      const filtered = subcategories.filter(sub => {
+        return sub.category_id === parseInt(formData.category);
+      });
+      setFilteredSubcategories(filtered);
+      setSearchableSubcategories(filtered);
+    } else {
+      setFilteredSubcategories([]);
+      setSearchableSubcategories([]);
+    }
+  }, [formData.category, subcategories]);
+
   const resetForm = () => {
     setFormData({
       description: "",
@@ -197,6 +279,8 @@ export function MovementForm({
       amount: "",
       category: "",
       subCategory: "",
+      categoryText: "",
+      subCategoryText: "",
       billNumber: "",
       billDate: "",
       entityName: "",
@@ -397,7 +481,10 @@ export function MovementForm({
       open={open}
       onOpenChange={(newOpen) => {
         if (!loading || !newOpen) {
-          onOpenChange(newOpen)
+          onOpenChange(newOpen);
+          if (!newOpen) {
+            resetForm();
+          }
         }
       }}
     >
@@ -420,7 +507,7 @@ export function MovementForm({
                   <Label htmlFor="description">Descripción</Label>
                   <Input
                     id="description"
-                    value={formData.description}
+                    value={formData.description || ""}
                     onChange={(e) =>
                       setFormData((prev: MovementFormData) => ({ ...prev, description: e.target.value }))
                     }
@@ -532,7 +619,7 @@ export function MovementForm({
                         step="0.01"
                         min="0"
                         className="pl-6"
-                        value={formData.amount}
+                        value={formData.amount || ""}
                         onChange={(e) =>
                           setFormData((prev: MovementFormData) => ({
                             ...prev,
@@ -557,7 +644,7 @@ export function MovementForm({
                         step="0.01"
                         min="0"
                         className="pl-6"
-                        value={formData.amount}
+                        value={formData.amount || ""}
                         onChange={(e) =>
                           setFormData((prev: MovementFormData) => ({
                             ...prev,
@@ -592,7 +679,7 @@ export function MovementForm({
                       <Label htmlFor="customPaymentType">Especifique el método de pago</Label>
                       <Input
                         id="customPaymentType"
-                        value={formData.customPaymentType}
+                        value={formData.customPaymentType || ""}
                         onChange={(e) =>
                           setFormData((prev: MovementFormData) => ({ ...prev, customPaymentType: e.target.value }))
                         }
@@ -605,26 +692,145 @@ export function MovementForm({
 
                 <div className="space-y-2">
                   <Label htmlFor="category">Rubro</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData((prev: MovementFormData) => ({ ...prev, category: e.target.value }))}
-                    required
-                    disabled={formData.isTaxPayment} // Deshabilitar si es un pago de impuesto
-                  />
+                  <div className="relative category-dropdown flex items-center gap-2">
+                    <Input
+                      placeholder="Buscar rubro..."
+                      value={formData.categoryText || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData((prev: MovementFormData) => ({ 
+                          ...prev, 
+                          categoryText: value,
+                          category: "" // Limpiar la categoría seleccionada cuando se escribe
+                        }));
+                        
+                        const searchTerm = value.toLowerCase();
+                        const filtered = categories.filter(cat => 
+                          cat.description.toLowerCase().includes(searchTerm)
+                        );
+                        setFilteredCategories(filtered);
+                        setCategoryOpen(true);
+                      }}
+                      onFocus={() => {
+                        setCategoryOpen(true);
+                        setFilteredCategories(categories);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => setShowAddCategoryModal(true)}
+                      title="Agregar rubro y subrubros"
+                    >
+                      +
+                    </Button>
+                    {categoryOpen && (
+                      <div className="absolute top-full left-0 right-0 bg-background border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((category) => (
+                            <div
+                              key={category.id}
+                              className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer border-b last:border-b-0"
+                              onClick={() => {
+                                setFormData((prev: MovementFormData) => ({ 
+                                  ...prev, 
+                                  category: category.id,
+                                  categoryText: category.description,
+                                  subCategory: "" // Resetear subcategoría cuando cambia la categoría
+                                }))
+                                setCategoryOpen(false)
+                              }}
+                            >
+                              {category.description}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-muted-foreground text-center">
+                            No se encontró ningún rubro.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
+                {/* Sub-rubro */}
                 <div className="space-y-2">
                   <Label htmlFor="subCategory">Sub-rubro</Label>
-                  <Input
-                    id="subCategory"
-                    value={formData.subCategory}
-                    onChange={(e) =>
-                      setFormData((prev: MovementFormData) => ({ ...prev, subCategory: e.target.value }))
-                    }
-                    required
-                    disabled={formData.isTaxPayment} // Deshabilitar si es un pago de impuesto
-                  />
+                  <div className="relative subcategory-dropdown flex items-center gap-2">
+                    <Input
+                      placeholder={formData.category ? "Buscar sub-rubro..." : "Primero seleccione un rubro"}
+                      value={formData.subCategoryText || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData((prev: MovementFormData) => ({ 
+                          ...prev, 
+                          subCategoryText: value,
+                          subCategory: "" // Limpiar la subcategoría seleccionada cuando se escribe
+                        }));
+                        const searchTerm = value.toLowerCase();
+                        const filtered = searchableSubcategories.filter(sub => 
+                          sub.description.toLowerCase().includes(searchTerm)
+                        );
+                        setFilteredSubcategories(filtered);
+                        setSubcategoryOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (formData.category) {
+                          setSubcategoryOpen(true);
+                          setFilteredSubcategories(searchableSubcategories);
+                        }
+                      }}
+                      disabled={!formData.category || formData.isTaxPayment}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!formData.category) return;
+                        // Obtener nombre del rubro seleccionado
+                        const cat = categories.find(c => c.id === formData.category);
+                        setEditCategoryName(cat ? cat.description : "");
+                        // Obtener subrubros actuales de ese rubro
+                        const subs = subcategories.filter(sub => sub.category_id === formData.category);
+                        setEditSubcategories(subs.map(s => s.description));
+                        setEditSubcategoryIds(subs.map(s => s.id));
+                        setShowEditSubcategoryModal(true);
+                      }}
+                      title="Editar/agregar subrubros"
+                      disabled={!formData.category}
+                    >
+                      +
+                    </Button>
+                    {subcategoryOpen && formData.category && (
+                      <div className="absolute top-full left-0 right-0 bg-background border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        {filteredSubcategories.length > 0 ? (
+                          filteredSubcategories.map((subcategory) => (
+                            <div
+                              key={subcategory.id}
+                              className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer border-b last:border-b-0"
+                              onClick={() => {
+                                setFormData((prev: MovementFormData) => ({ 
+                                  ...prev, 
+                                  subCategory: subcategory.id,
+                                  subCategoryText: subcategory.description
+                                }))
+                                setSubcategoryOpen(false)
+                              }}
+                            >
+                              {subcategory.description}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-muted-foreground text-center">
+                            No se encontró ningún sub-rubro.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -636,7 +842,7 @@ export function MovementForm({
                   </Label>
                   <Input
                     id="billNumber"
-                    value={formData.billNumber}
+                    value={formData.billNumber || ""}
                     onChange={(e) => setFormData((prev: MovementFormData) => ({ ...prev, billNumber: e.target.value }))}
                     required={isBillNumberRequired}
                     className={billNumberError ? "border-red-500" : ""}
@@ -649,7 +855,7 @@ export function MovementForm({
                   <Input
                     id="billDate"
                     type="date"
-                    value={formData.billDate}
+                    value={formData.billDate || ""}
                     onChange={(e) => setFormData((prev: MovementFormData) => ({ ...prev, billDate: e.target.value }))}
                     required
                   />
@@ -661,11 +867,11 @@ export function MovementForm({
                     <div className="flex-1 grid grid-cols-2 gap-2">
                       <Input
                         placeholder="Nombre de la entidad"
-                        value={formData.entityName}
+                        value={formData.entityName || ""}
                         readOnly
                         className="bg-muted"
                       />
-                      <Input placeholder="CUIT/CUIL" value={formData.entityCuitCuil} readOnly className="bg-muted" />
+                      <Input placeholder="CUIT/CUIL" value={formData.entityCuitCuil || ""} readOnly className="bg-muted" />
                     </div>
                     <Button type="button" variant="outline" onClick={() => setEntitySelectorOpen(true)}>
                       Seleccionar
@@ -765,6 +971,167 @@ export function MovementForm({
         />
 
         <TaxDialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen} onTaxCreated={handleTaxCreated} />
+        {/* Modal para agregar rubro y subrubros */}
+        <Dialog open={showAddCategoryModal} onOpenChange={(open) => {
+          setShowAddCategoryModal(open);
+          if (!open) {
+            setNewCategory("");
+            setNewSubcategories([""]);
+          }
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Agregar nuevo rubro y subrubros</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nombre del rubro</label>
+                <Input value={newCategory || ""} onChange={e => setNewCategory(e.target.value)} placeholder="Ej: Insumos" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subrubros</label>
+                {newSubcategories.map((sub, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <Input
+                      value={sub || ""}
+                      onChange={e => {
+                        const arr = [...newSubcategories];
+                        arr[idx] = e.target.value;
+                        setNewSubcategories(arr);
+                      }}
+                      placeholder={`Subrubro ${idx + 1}`}
+                    />
+                    <Button type="button" size="icon" variant="ghost" onClick={() => setNewSubcategories(arr => arr.filter((_, i) => i !== idx))} disabled={newSubcategories.length === 1}>-</Button>
+                  </div>
+                ))}
+                <Button type="button" size="sm" variant="outline" onClick={() => setNewSubcategories(arr => [...arr, ""])}>Agregar subrubro</Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" onClick={async () => {
+                if (!newCategory.trim()) return;
+                setSavingCategory(true);
+                // Crear rubro
+                const resCat = await fetch("/api/create-category", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ description: newCategory })
+                });
+                const catData = await resCat.json();
+                if (!catData.id) {
+                  setSavingCategory(false);
+                  return;
+                }
+                // Crear subrubros
+                for (const sub of newSubcategories) {
+                  if (sub.trim()) {
+                    await fetch("/api/create-subcategory", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ description: sub, category_id: catData.id })
+                    });
+                  }
+                }
+                // Refrescar combos
+                await fetchCategories();
+                await fetchSubcategories();
+                setShowAddCategoryModal(false);
+                setNewCategory("");
+                setNewSubcategories([""]);
+                setSavingCategory(false);
+              }} disabled={savingCategory}>
+                Guardar
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => {
+                setShowAddCategoryModal(false);
+                setNewCategory("");
+                setNewSubcategories([""]);
+              }} disabled={savingCategory}>Cancelar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal para editar/agregar subrubros */}
+        <Dialog open={showEditSubcategoryModal} onOpenChange={(open) => {
+          setShowEditSubcategoryModal(open);
+          if (!open) {
+            setEditSubcategories([]);
+            setEditSubcategoryIds([]);
+            setEditCategoryName("");
+          }
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Editar/agregar subrubros</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Rubro seleccionado</label>
+                <div className="bg-muted border border-input rounded-md px-3 py-2 text-sm text-muted-foreground">
+                  {editCategoryName}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subrubros</label>
+                {editSubcategories.map((sub, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <Input
+                      value={sub || ""}
+                      onChange={e => {
+                        const arr = [...editSubcategories];
+                        arr[idx] = e.target.value;
+                        setEditSubcategories(arr);
+                      }}
+                      placeholder={`Subrubro ${idx + 1}`}
+                    />
+                  </div>
+                ))}
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditSubcategories(arr => [...arr, ""])}>Agregar subrubro</Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" onClick={async () => {
+                if (!formData.category) return;
+                setSavingSubcategories(true);
+                // Actualizar o crear subrubros
+                for (let i = 0; i < editSubcategories.length; i++) {
+                  const desc = editSubcategories[i].trim();
+                  if (!desc) continue;
+                  const id = editSubcategoryIds[i];
+                  if (id) {
+                    // Actualizar subrubro existente
+                    await fetch("/api/create-subcategory", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id, description: desc, category_id: formData.category })
+                    });
+                  } else {
+                    // Crear nuevo subrubro
+                    await fetch("/api/create-subcategory", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ description: desc, category_id: formData.category })
+                    });
+                  }
+                }
+                await fetchSubcategories();
+                setShowEditSubcategoryModal(false);
+                setEditSubcategories([]);
+                setEditSubcategoryIds([]);
+                setEditCategoryName("");
+                setSavingSubcategories(false);
+              }} disabled={savingSubcategories}>
+                Guardar
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => {
+                setShowEditSubcategoryModal(false);
+                setEditSubcategories([]);
+                setEditSubcategoryIds([]);
+                setEditCategoryName("");
+              }} disabled={savingSubcategories}>Cancelar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   )

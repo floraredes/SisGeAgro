@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ error: "Error al obtener entidades" }, { status: 500 })
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ entities: data })
   } catch (error) {
     console.error("Error in entities API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
