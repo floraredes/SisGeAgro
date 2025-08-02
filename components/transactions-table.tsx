@@ -478,12 +478,27 @@ export function TransactionsTable({
         // Preprocesar fechas y limpiar datos como antes
         const processedRows = rows.map((row) => {
           let billDate = row["billDate"] || row["fechaComprobante"] || ""
-          if (/^\d{2}-\d{2}-\d{4}$/.test(billDate)) {
-            const [day, month, year] = billDate.split("-")
-            billDate = `${year}-${month}-${day}`
-          } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(billDate)) {
-            const [day, month, year] = billDate.split("/")
-            billDate = `${year}-${month}-${day}`
+          
+          // Función para formatear fecha a YYYY-MM-DD
+          const formatDate = (dateStr: string, separator: string) => {
+            const parts = dateStr.split(separator)
+            if (parts.length === 3) {
+              const [day, month, year] = parts
+              // Asegurar que día y mes tengan 2 dígitos
+              const formattedDay = day.padStart(2, '0')
+              const formattedMonth = month.padStart(2, '0')
+              return `${year}-${formattedMonth}-${formattedDay}`
+            }
+            return dateStr
+          }
+          
+          // Formato DD-MM-YYYY
+          if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(billDate)) {
+            billDate = formatDate(billDate, "-")
+          } 
+          // Formato DD/MM/YYYY
+          else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(billDate)) {
+            billDate = formatDate(billDate, "/")
           }
           return {
             description: row["description"] || row["detalle"] || "",
