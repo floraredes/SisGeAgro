@@ -40,8 +40,21 @@ export default function DashboardLayout({
         }
 
         setUserId(currentUser.id)
-        const displayName = currentUser.email?.split("@")[0] || "Usuario"
-        setUserName(displayName)
+        
+        // Obtener el nombre de usuario desde la base de datos
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("username")
+          .eq("id", currentUser.id)
+          .single()
+        
+        if (!userError && userData?.username) {
+          setUserName(userData.username)
+        } else {
+          // Fallback al email si no hay username
+          const displayName = currentUser.email?.split("@")[0] || "Usuario"
+          setUserName(displayName)
+        }
 
         // Consultar notificaciones
         const { data: notifData, error: notifError } = await supabase
