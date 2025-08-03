@@ -37,7 +37,7 @@ function getMonthRangeString(startDate: string, endDate: string) {
   if (startMonthName === endMonthName) {
     return startMonthName.charAt(0).toUpperCase() + startMonthName.slice(1)
   }
-  return `${startMonthName.charAt(0).toUpperCase() + startMonthName.slice(1)} - ${endMonthName}`
+  return `${startMonthName.charAt(0).toUpperCase() + startMonthName.slice(1)} - ${endMonthName.charAt(0).toUpperCase() + endMonthName.slice(1)}`
 }
 
 export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
@@ -406,7 +406,7 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
       {/* Gráfico de evolución mensual acumulada */}
       <Card className="shadow-lg border-none col-span-full">
         <CardHeader>
-          <CardTitle>Evolución Mensual Acumulada - {getMonthRangeString(startDate, endDate)}</CardTitle>
+          <CardTitle>Evolución Mensual Acumulada  {getMonthRangeString(startDate, endDate)}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
