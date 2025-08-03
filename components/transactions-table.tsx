@@ -20,7 +20,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { getMovements, getCategories, getSubcategories, getEntities, getPaymentTypes } from "@/lib/api-utils"
 import { getCurrentUser } from "@/lib/auth-utils"
-import { createClient } from "@supabase/supabase-js"
 import { MovementForm } from "./movement-form"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog"
@@ -346,93 +345,22 @@ export function TransactionsTable({
     try {
       setIsDeleting(true)
 
-      // Obtener el usuario actual para verificar el tipo de autenticación
-      const currentUser = await getCurrentUser()
-      
-      if (!currentUser) {
-        throw new Error("No se pudo verificar la autenticación del usuario")
+      // Llamar a la API para eliminar el movimiento
+      const response = await fetch("/api/delete-movement", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          movementId: selectedMovement.id,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Error al eliminar el movimiento")
       }
-
-      // Usar cliente de administrador para usuarios locales
-      const supabaseClient = currentUser.type === "local" 
-        ? createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          )
-        : supabase
-
-      // 1. Obtener los datos del movimiento para conocer las relaciones
-      const { data: movementData, error: movementError } = await supabaseClient
-        .from("movements")
-        .select("operation_id")
-        .eq("id", selectedMovement.id)
-        .maybeSingle()
-
-      if (movementError) {
-        console.error("Error al obtener movimiento:", movementError)
-        throw new Error("No se pudo obtener la información del movimiento")
-      }
-
-      if (!movementData) {
-        throw new Error("El movimiento no existe o ya fue eliminado")
-      }
-
-      // 2. Eliminar los impuestos asociados al movimiento
-      const { error: taxesError } = await supabaseClient
-        .from("movement_taxes")
-        .delete()
-        .eq("movement_id", selectedMovement.id)
-
-      if (taxesError) throw taxesError
-
-      // 3. Eliminar el movimiento
-      const { data: deleteResult, error: deleteError } = await supabaseClient
-        .from("movements")
-        .delete()
-        .eq("id", selectedMovement.id)
-        .select()
-
-      if (deleteError) {
-        console.error("Error al eliminar movimiento:", deleteError)
-        throw new Error("No se pudo eliminar el movimiento")
-      }
-
-      if (!deleteResult || deleteResult.length === 0) {
-        throw new Error("El movimiento no existe o ya fue eliminado")
-      }
-
-      // 4. Obtener los datos de la operación
-      const { data: operationData, error: operationError } = await supabaseClient
-        .from("operations")
-        .select("payment_id, bill_id")
-        .eq("id", movementData.operation_id)
-        .maybeSingle()
-
-      if (operationError) {
-        console.error("Error al obtener operación:", operationError)
-        throw new Error("No se pudo obtener la información de la operación")
-      }
-
-      if (!operationData) {
-        throw new Error("La operación asociada no existe")
-      }
-
-      // 5. Eliminar la operación
-      const { error: operationDeleteError } = await supabaseClient
-        .from("operations")
-        .delete()
-        .eq("id", movementData.operation_id)
-
-      if (operationDeleteError) throw operationDeleteError
-
-      // 6. Eliminar el pago y la factura
-      const { error: paymentError } = await supabaseClient.from("payment").delete().eq("id", operationData.payment_id)
-
-      if (paymentError) throw paymentError
-
-      const { error: billError } = await supabaseClient.from("bills").delete().eq("id", operationData.bill_id)
-
-      if (billError) throw billError
 
       // Mostrar mensaje de éxito
       toast({
