@@ -189,7 +189,7 @@ export function TransactionsTable({
   // Aplicar filtros en el lado del cliente
   useEffect(() => {
     applyFilters()
-  }, [allTransactions, categoryFilter, subcategoryFilter, paymentTypeFilter, entityFilter, searchTerm, currentPage, movementTypeFilter])
+  }, [allTransactions, categoryFilter, subcategoryFilter, paymentTypeFilter, entityFilter, searchTerm, currentPage])
 
   // Cerrar el menú contextual al hacer clic fuera
   useEffect(() => {
@@ -212,11 +212,6 @@ export function TransactionsTable({
     }
 
     let filteredData = [...allTransactions]
-
-    // Aplicar filtro de tipo de movimiento
-    if (movementTypeFilter && movementTypeFilter !== "all") {
-      filteredData = filteredData.filter((item) => item.movimiento === movementTypeFilter)
-    }
 
     // Aplicar filtro de categoría
     if (categoryFilter && categoryFilter !== "all") {

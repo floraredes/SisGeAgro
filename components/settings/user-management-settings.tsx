@@ -344,7 +344,7 @@ const handleAddUser = async (e: React.FormEvent) => {
                   <span>Agregar Usuario</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Agregar Nuevo Usuario</DialogTitle>
                   <DialogDescription>Crea una nueva cuenta de usuario con permisos específicos</DialogDescription>
