@@ -485,9 +485,9 @@ const handleAddUser = async (e: React.FormEvent) => {
         </CardContent>
       </Card>
 
-      {/* Edit User Dialog */}
-      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
-        <DialogContent>
+             {/* Edit User Dialog */}
+       <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar Usuario</DialogTitle>
             <DialogDescription>Modifica los detalles y permisos del usuario</DialogDescription>
