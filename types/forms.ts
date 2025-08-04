@@ -10,14 +10,15 @@ export interface MovementFormData {
   paymentType: string
   customPaymentType: string
   amount: number
-  category: string
-  subCategory: string
+  category: number | string // ID de la categoría (number) o string vacío
+  subCategory: number | string // ID de la subcategoría (number) o string vacío
   categoryText: string // Texto libre para categoría
   subCategoryText: string // Texto libre para subcategoría
   billNumber: string
   billDate: string
   entityName: string
-  entityId: string // CUIT/CUIL de la entidad
+  entityId: string // ID de la entidad
+  entityCuitCuil: string // CUIT/CUIL de la entidad
   selectedTaxes: Tax[]
   // Nuevos campos para pagos de impuestos
   isTaxPayment: boolean

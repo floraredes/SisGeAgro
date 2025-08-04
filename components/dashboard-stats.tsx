@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowDown, DollarSign, Receipt, TrendingDown, TrendingUp, ArrowLeftRight } from "lucide-react"
-import { getDashboardStats } from "@/lib/api-utils"
+// import { getDashboardStats } from "@/lib/api-utils"
 import { useCurrency } from "@/contexts/currency-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,9 +54,14 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
     async function fetchMovements() {
       setLoading(true)
       try {
-        // Usar las nuevas utilidades que manejan ambos tipos de usuarios
-        const data = await getDashboardStats(startDate, endDate)
-        setMovements(data || [])
+        // Usar la API de dashboard-stats directamente
+        const response = await fetch(`/api/dashboard-stats?startDate=${startDate}&endDate=${endDate}`)
+        if (!response.ok) {
+          throw new Error(`Error al obtener estadísticas: ${response.status}`)
+        }
+        const result = await response.json()
+        const data = result.data || []
+        setMovements(data)
       } catch (error) {
         console.error("Error fetching movements:", error)
       } finally {
@@ -106,10 +111,10 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
       const taxesAmount = movement.movement_taxes?.reduce((sum: any, tax: any) => sum + (tax.calculated_amount || 0), 0) || 0
       if (movement.movement_type === "ingreso") {
         income += amount
-        taxes -= taxesAmount
+        taxes += taxesAmount // ✅ CORREGIDO: Sumar impuestos de ingresos
       } else if (movement.movement_type === "egreso") {
         expense += amount
-        taxes += taxesAmount
+        taxes += taxesAmount // ✅ Sumar impuestos de egresos
       }
     })
     return { income, expense, taxes }
@@ -708,21 +713,9 @@ export function DashboardStats({ startDate, endDate }: DashboardStatsProps) {
                       labelFormatter={(label) => `Mes: ${label}`}
                     />
                     <Legend verticalAlign="bottom" height={50} wrapperStyle={{ paddingTop: 0, bottom: 0 }} />
-                    <Bar dataKey="ingresos" name="Ingresos" fill="#4ade80" radius={[4, 4, 0, 0]}>
-                      {monthlyData.map((entry, index) => (
-                        <Cell key={`ingresos-${entry.monthKey}-${index}`} />
-                      ))}
-                    </Bar>
-                    <Bar dataKey="egresos" name="Egresos" fill="#f87171" radius={[4, 4, 0, 0]}>
-                      {monthlyData.map((entry, index) => (
-                        <Cell key={`egresos-${entry.monthKey}-${index}`} />
-                      ))}
-                    </Bar>
-                    <Bar dataKey="balance" name="Balance" fill="#60a5fa" radius={[4, 4, 0, 0]}>
-                      {monthlyData.map((entry, index) => (
-                        <Cell key={`balance-${entry.monthKey}-${index}`} />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="ingresos" name="Ingresos" fill="#4ade80" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="egresos" name="Egresos" fill="#f87171" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="balance" name="Balance" fill="#60a5fa" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

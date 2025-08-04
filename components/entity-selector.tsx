@@ -55,24 +55,24 @@ export function EntitySelector({ open, onOpenChange, onSelectEntity, onCreateNew
     setLoading(true)
     setError(null)
     try { 
-      let data;
-      if (isInternal) {
-        // Usuarios internos: fetch a tu API
-        const res = await fetch('/api/entities');
+      console.log('🔄 [EntitySelector] Fetching entities...');
+      // Siempre usar la API para tener permisos completos
+      const res = await fetch('/api/entities');
+      if (res.ok) {
         const json = await res.json();
-        data = json.entities || [];
+        console.log('✅ [EntitySelector] Entities loaded from API:', json.entities);
         setEntities(json.entities || []);
       } else {
-        // Admins: directo a Supabase
-        const { data: supaData, error } = await supabase.from("entity").select("*");
-        if (error) throw error;
-        data = supaData || []
-    }
-    setEntities(data || []);
-    }catch (err: any) {
-    setError(err.message || "Error al cargar entidades");
+        console.error('❌ [EntitySelector] Error en fetchEntities - Status:', res.status);
+        const errorText = await res.text();
+        console.error('❌ [EntitySelector] Error response:', errorText);
+        setError('Error al cargar entidades');
+      }
+    } catch (err: any) {
+      console.error('❌ [EntitySelector] Error fetching entities:', err);
+      setError(err.message || "Error al cargar entidades");
     } finally {
-    setLoading(false);
+      setLoading(false);
     }
   }
 

@@ -91,9 +91,11 @@ export function MovementForm({
     movementType: defaultMovementType || "ingreso",
     paymentType: "",
     customPaymentType: "",
-    amount: "", 
+    amount: 0, 
     category: "",
     subCategory: "",
+    categoryText: "",
+    subCategoryText: "",
     billNumber: "",
     billDate: "",
     entityName: "",
@@ -137,6 +139,7 @@ export function MovementForm({
 
   useEffect(() => {
     if (open) {
+      console.log('🔄 [MovementForm] Form opened, fetching data...');
       fetchTaxes()
       fetchCategories()
       fetchSubcategories()
@@ -150,6 +153,11 @@ export function MovementForm({
     }
     // eslint-disable-next-line
   }, [open, user])
+
+  // Log cuando availableTaxes cambia
+  useEffect(() => {
+    console.log('📊 [MovementForm] availableTaxes updated:', availableTaxes);
+  }, [availableTaxes]);
 
   useEffect(() => {
     if (isEditMode && existingData && open) {
@@ -200,7 +208,7 @@ export function MovementForm({
         ...prev,
         category: "Impuestos y Tasas",
         subCategory: prev.relatedTaxId
-          ? availableTaxes.find((tax) => tax.id === prev.relatedTaxId)?.name || "Pago de Impuesto"
+          ? availableTaxes.find((tax) => tax.id === prev.relatedTaxId?.toString())?.name || "Pago de Impuesto"
           : "Pago de Impuesto",
         movementType: "egreso",
       }))
@@ -209,16 +217,21 @@ export function MovementForm({
   }, [formData.isTaxPayment, formData.relatedTaxId, availableTaxes])
 
   const fetchTaxes = async () => {
-    if (isInternal) {
-     // Usuarios internos: fetch a la API (usa service key)
+    try {
+      // Siempre usar la API para tener permisos completos
       const res = await fetch('/api/taxes');
-      const json = await res.json();
-      setAvailableTaxes(json.taxes || []);
-    } else {
-      // Admins: directo a Supabase
-      const { data, error } = await supabase.from("taxes").select("*");
-      setAvailableTaxes(data || []);
-   }
+      if (res.ok) {
+        const json = await res.json();
+        console.log('✅ [MovementForm] Taxes loaded from API:', json.taxes);
+        setAvailableTaxes(json.taxes || []);
+      } else {
+        console.error('❌ [MovementForm] Error en fetchTaxes - Status:', res.status);
+        const errorText = await res.text();
+        console.error('❌ [MovementForm] Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ [MovementForm] Error fetching taxes:', error);
+    }
   };
 
   const fetchCategories = async () => {
@@ -260,7 +273,8 @@ export function MovementForm({
   useEffect(() => {
     if (formData.category) {
       const filtered = subcategories.filter(sub => {
-        return sub.category_id === parseInt(formData.category);
+        const categoryId = typeof formData.category === 'string' ? parseInt(formData.category) : formData.category;
+        return sub.category_id === categoryId;
       });
       setFilteredSubcategories(filtered);
       setSearchableSubcategories(filtered);
@@ -276,7 +290,7 @@ export function MovementForm({
       movementType: "ingreso",
       paymentType: "",
       customPaymentType: "",
-      amount: "",
+      amount: 0,
       category: "",
       subCategory: "",
       categoryText: "",
@@ -285,6 +299,7 @@ export function MovementForm({
       billDate: "",
       entityName: "",
       entityId: "",
+      entityCuitCuil: "",
       selectedTaxes: [],
       isTaxPayment: false,
       relatedTaxId: null,
@@ -435,22 +450,31 @@ export function MovementForm({
       }, 500);
     }
   }
-  const handleTaxCreated = async (taxName: string, percentage: number) => {
+  const handleTaxCreated = async (taxName: string, percentage: number | null) => {
     try {
-      await handleCreateTax(taxName, percentage)
-      await fetchTaxes()
-      setTaxDialogOpen(false)
+      console.log('🔄 [MovementForm] Creating tax:', { taxName, percentage });
+      const result = await handleCreateTax(taxName, percentage || 0);
+      console.log('✅ [MovementForm] Tax created successfully:', result);
+      
+      // Esperar un poco antes de refrescar la lista
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('🔄 [MovementForm] Refreshing taxes list...');
+      await fetchTaxes();
+      
+      setTaxDialogOpen(false);
       toast({
         title: "Impuesto creado",
         description: "El impuesto ha sido creado correctamente y está disponible para seleccionar",
         type: "success",
-      })
+      });
     } catch (error: any) {
+      console.error('❌ [MovementForm] Error in handleTaxCreated:', error);
       toast({
         title: "Error creando impuesto",
         description: error.message || "No se pudo crear el impuesto",
         variant: "destructive",
-      })
+      });
     }
   }
   
@@ -461,13 +485,18 @@ export function MovementForm({
     const entityName = formData.entityName || (isEditMode && existingData && (existingData.empresa || (existingData.entity && existingData.entity.nombre))) || "";
     const entityId = formData.entityId || (isEditMode && existingData && (existingData.entityId || (existingData.entity && existingData.entity.id))) || "";
     const entityCuitCuil = formData.entityCuitCuil || (isEditMode && existingData && (existingData.entityCuitCuil || existingData.cuit_cuil || (existingData.entity && existingData.entity.cuit_cuil))) || "";
+    
+    // Convertir category y subCategory a string antes de usar trim()
+    const categoryStr = String(formData.category || "");
+    const subCategoryStr = String(formData.subCategory || "");
+    
     return (
       formData.description.trim() &&
       formData.amount && Number(formData.amount) > 0 &&
       formData.paymentType &&
       formData.movementType &&
-      formData.category.trim() &&
-      formData.subCategory.trim() &&
+      categoryStr.trim() &&
+      subCategoryStr.trim() &&
       formData.billNumber.trim() &&
       formData.billDate &&
       entityName.trim() &&
@@ -932,43 +961,52 @@ export function MovementForm({
           </div>
         </ScrollArea>
 
-        <EntitySelector
-          open={entitySelectorOpen}
-          onOpenChange={setEntitySelectorOpen}
-          onSelectEntity={(entity) => {
-            setFormData((prev) => ({
-              ...prev,
-              entityName: entity.nombre,
-              entityId: entity.id,
-              entityCuitCuil: entity.cuit_cuil, // solo este campo
-            }))
-            setEntitySelectorOpen(false)
-          }}
-          onCreateNewEntity={() => {
-            setEntitySelectorOpen(false)
-            setEntityFormOpen(true)
-          }}
-          user={user}
-        />
+                 <EntitySelector
+           open={entitySelectorOpen}
+           onOpenChange={setEntitySelectorOpen}
+           onSelectEntity={(entity) => {
+             setFormData((prev) => ({
+               ...prev,
+               entityName: entity.nombre,
+               entityId: entity.id,
+               entityCuitCuil: entity.cuit_cuil, // solo este campo
+             }))
+             setEntitySelectorOpen(false)
+           }}
+           onCreateNewEntity={() => {
+             setEntitySelectorOpen(false)
+             setEntityFormOpen(true)
+           }}
+           user={user}
+           key={entitySelectorOpen ? 'open' : 'closed'} // Forzar re-render cuando se abre
+         />
 
-        <EntityForm
-          open={entityFormOpen}
-          onOpenChange={setEntityFormOpen}
-          onEntityCreated={async (nombre, cuit_cuil) => {
-            try {
-              const entity = await handleCreateEntity(nombre, cuit_cuil)
-              setFormData((prev) => ({
-                ...prev,
-                entityName: entity.nombre,
-                entityId: entity.id,
-                entityCuitCuil: entity.cuit_cuil, // solo este campo
-              }))
-              setEntityFormOpen(false)
-            } catch (error) {
-              console.error("Error al crear entidad:", error)
-            }
-          }}
-        />
+                 <EntityForm
+           open={entityFormOpen}
+           onOpenChange={setEntityFormOpen}
+           onEntityCreated={async (nombre, cuit_cuil) => {
+             try {
+               console.log('🔄 [MovementForm] Creating entity:', { nombre, cuit_cuil });
+               const entity = await handleCreateEntity(nombre, cuit_cuil)
+               console.log('✅ [MovementForm] Entity created successfully:', entity);
+               
+               setFormData((prev) => ({
+                 ...prev,
+                 entityName: entity.nombre,
+                 entityId: entity.id,
+                 entityCuitCuil: entity.cuit_cuil, // solo este campo
+               }))
+               
+               // Reabrir el selector de entidades para mostrar la nueva entidad
+               setEntityFormOpen(false)
+               setTimeout(() => {
+                 setEntitySelectorOpen(true)
+               }, 100)
+             } catch (error) {
+               console.error("Error al crear entidad:", error)
+             }
+           }}
+         />
 
         <TaxDialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen} onTaxCreated={handleTaxCreated} />
         {/* Modal para agregar rubro y subrubros */}

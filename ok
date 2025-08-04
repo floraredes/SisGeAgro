@@ -1,0 +1,175 @@
+[33mcommit e7596168fcbd434f738b1b5a5444ddf283c99f90[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Aug 3 22:52:46 2025 -0300
+
+    Arreglo de los graficos de torta
+
+[33mcommit b36a8edc762c2ece3d89c45069e347769c263375[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Aug 3 02:07:12 2025 -0300
+
+    api para eliminar registros
+
+[33mcommit 4f7650c00587ce91de149357cb794c671ceb61bf[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Aug 3 02:02:53 2025 -0300
+
+    Arreglo del error que los usuarios locales no pueden eliminar registros
+
+[33mcommit c3525ab8b0b1fe32a335bcfa1575ee84a88b8eb5[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Aug 3 01:52:50 2025 -0300
+
+    Cambio en el titulo del grafico de dashboard
+
+[33mcommit 0f1771f497a532170c0ea7e70bea4d941e636c06[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Aug 3 01:06:36 2025 -0300
+
+    Arreglo de como agarra el nombre de usuairo para mostrar en el header
+
+[33mcommit 42af43742d01f47589db8b51cdeb430127ba4f4e[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sat Aug 2 22:35:58 2025 -0300
+
+    Arreglo del ancho del form para editar usuario
+
+[33mcommit dd92dbf0fbc59d7b4acc3839e31cc61cde434f69[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sat Aug 2 22:30:47 2025 -0300
+
+    cambio de ancho del form de nuevo usuario
+
+[33mcommit 9d4d53e78b02f52bae0cec74083f9aa9352b982d[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sat Aug 2 17:46:18 2025 -0300
+
+    Arreglo del filtrado en la tabla
+
+[33mcommit 4193af4cf577ebdffa485017d815cee1abba67f2[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sat Aug 2 17:30:51 2025 -0300
+
+    agregado de dependencia react-avatar
+
+[33mcommit 2b4a046a3a7745f0fb234867ebd0dabea2a02dbd[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sat Aug 2 17:16:50 2025 -0300
+
+    Arreglo del manejo de formato de fechas a la hora de importar
+
+[33mcommit b5db9cba2b8a6f891ee3d2e8366a496ca4a1bfce[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Sun Jul 20 18:16:35 2025 -0300
+
+    Unificación lógica de egresos, limpieza de logs y mejoras en formularios
+
+[33mcommit 8ef1e3684f79c86ee3de7ed3d913e7042478a17c[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Thu Jul 17 01:14:01 2025 -0300
+
+    corrección de manejo de usuarios locales
+
+[33mcommit 87158a4522059c1d314dbb9b17d0469468518ccf[m
+Author: lisandroib <ibarra.lisandro@gmail.com>
+Date:   Wed Jul 16 20:23:11 2025 -0300
+
+    corrección de manejo de usuarios locales
+
+[33mcommit 1ac1dccb356052c888fbce93470789042977b30d[m
+Merge: 3b49af5 e5652f7
+Author: floraredess <floraredess@gmail.com>
+Date:   Wed Jul 16 18:12:25 2025 -0300
+
+    Merge branch 'main' of https://github.com/floraredes/sisgeagro
+
+[33mcommit 3b49af551f14a2845818ba58a680aabd441bdafd[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Wed Jul 16 18:11:46 2025 -0300
+
+    Co-authored-by: Aguspr18 <Aguspr18@users.noreply.github.com>
+    Co-authored-by: lisandroib <lisandroib@users.noreply.github.com>
+
+[33mcommit e5652f7169f0f0d9e2c1d13e32ef453e02fd5386[m
+Author: Florencia Aredes <62720306+floraredes@users.noreply.github.com>
+Date:   Wed Jun 25 20:02:16 2025 -0300
+
+    Update and rename README.txt to README.md
+
+[33mcommit 93295b899ea99a59ad34e9961ce4ad6412ab5870[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Wed Jun 25 19:06:32 2025 -0300
+
+    Co-authored-by: Aguspr18 <Aguspr18@users.noreply.github.com>
+    Co-authored-by: lisandroib <lisandroib@users.noreply.github.com>
+
+[33mcommit ba96d7c7c3977681aa821564ea85ac5acd3463fe[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Fri Jun 20 22:20:38 2025 -0300
+
+    OB
+
+[33mcommit 3910c72f0a83d5aa27a3c81bc6bf820db87f726e[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Fri Jun 20 18:56:39 2025 -0300
+
+    feat: agrega endpoints y componentes para gestión de entidades, movimientos y usuarios
+    
+    On branch main
+    Changes to be committed:
+            new file:   app/api/create-bills/route.ts "Create bills API endpoint"
+            new file:   app/api/create-category/route.ts "Create category API endpoint"
+            new file:   app/api/create-movement-taxes/route.ts "Create movement taxes API endpoint"
+            new file:   app/api/create-movement/route.ts "Create movement API endpoint"
+            new file:   app/api/create-operations/route.ts "Create operations API endpoint"
+            new file:   app/api/create-payment/route.ts "Create payment API endpoint"
+            new file:   app/api/create-subcategory/route.ts "Create subcategory API endpoint"
+            new file:   app/api/create-tax/route.ts "Create tax API endpoint"
+            new file:   app/api/entities/route.ts "Entities API endpoint"
+            new file:   app/api/taxes/route.ts "Taxes API endpoint"
+            modified:   app/user-movement/page.tsx "User movement page"
+            new file:   app/user-movement/success/page.tsx "User movement success page"
+            modified:   components/entity-form.tsx "Entity form component"
+            modified:   components/entity-selector.tsx "Entity selector component"
+            modified:   components/movement-form.tsx "Movement form component"
+            modified:   components/settings/user-management-settings.tsx "User management settings component"
+            modified:   components/signup-form.tsx "Signup form component"
+            modified:   components/tax-dialog.tsx "Tax dialog component"
+            modified:   components/ui/dialog.tsx "Dialog component"
+
+[33mcommit 00ac242a539d57d445891c129cf52c1c66091fdd[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Sun Jun 8 20:52:53 2025 -0300
+
+    Add local users page to add transactions
+
+[33mcommit 8ff7b9f4a4d563e9acd47284c3a390bdf72e19cb[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Sun Jun 1 22:43:35 2025 -0300
+
+    Solved vulnerability in eslint
+
+[33mcommit a07da6b2489bc5b9c219a520be4d02ba0c1fbf1e[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Sun Jun 1 22:28:04 2025 -0300
+
+    Co-authored-by: lisandroib <lisandroib@users.noreply.github.com>
+
+[33mcommit 6e77c56ddf68edbf357858407e4731095422c124[m
+Merge: b99dc47 f399543
+Author: floraredess <floraredess@gmail.com>
+Date:   Sun Jun 1 18:02:15 2025 -0300
+
+    Agregar cambios hechos en la version local
+
+[33mcommit b99dc47840f3d1f11c885a8a559385c6e7251153[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Sun Jun 1 17:56:41 2025 -0300
+
+    Agregar funcionalidad de manejar users
+
+[33mcommit f399543bba85ef72941e999fecc637dd4c7c527c[m
+Author: floraredess <floraredess@gmail.com>
+Date:   Sat May 31 17:06:50 2025 -0300
+
+    Initial commit: SisGeAgro v7.2 - Sistema de Gestión Económica Agropecuaria

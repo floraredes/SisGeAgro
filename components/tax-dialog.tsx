@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 interface TaxDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onTaxCreated: () => void
+  onTaxCreated: (taxName: string, percentage: number | null) => void
 }
 
 export function TaxDialog({ open, onOpenChange, onTaxCreated }: TaxDialogProps) {

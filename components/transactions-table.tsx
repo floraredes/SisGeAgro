@@ -290,17 +290,11 @@ export function TransactionsTable({
   const fetchTransactions = async () => {
     setLoading(true)
     try {
+      // Determinar qué tipo de movimiento filtrar
+      const filterType = movementType !== "all" ? movementType : movementTypeFilter
+      
       // Usar las nuevas utilidades que manejan ambos tipos de usuarios
-      let data = await getMovements(movementType !== "all" ? movementType : movementTypeFilter)
-
-      // Aplicar filtro de tipo de movimiento si es necesario
-      if (movementType !== "all" && movementTypeFilter !== "all") {
-        data = data.filter((item: any) => item.movement_type === movementTypeFilter)
-      }
-
-      if (movementType === "ingreso") {
-        // console.log("[Tabla de Ingresos] Datos recibidos:", data)
-      }
+      let data = await getMovements(filterType !== "all" ? { movementType: filterType } : undefined)
 
       if (data) {
         // Transformar los datos al formato esperado
@@ -321,10 +315,6 @@ export function TransactionsTable({
             entityId: item.operations?.bills?.entity_id,
             check: item.check || false,
         }))
-
-        if (movementType === "ingreso") {
-          // console.log("[Tabla de Ingresos] Datos transformados:", transformedData)
-        }
 
         setAllTransactions(transformedData)
         setTransactions(transformedData)

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("movements")
       .select(`
+        id,
         movement_type,
         description,
         sub_category_id,
@@ -29,7 +30,12 @@ export async function GET(request: NextRequest) {
           )
         ),
         movement_taxes (
-          calculated_amount
+          calculated_amount,
+          tax_id,
+          taxes (
+            name,
+            percentage
+          )
         ),
         sub_categories:sub_category_id (
           categories:category_id (
@@ -37,8 +43,6 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .gte("operations.bills.bill_date", startDate)
-      .lte("operations.bills.bill_date", endDate)
 
     if (error) {
       console.error("Error fetching dashboard stats:", error)
@@ -50,4 +54,4 @@ export async function GET(request: NextRequest) {
     console.error("Error in dashboard-stats API:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
-} 
+}

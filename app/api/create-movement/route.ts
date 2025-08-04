@@ -65,38 +65,72 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Buscar o crear categoría
-    let { data: category, error: categoryFetchError } = await supabase
-      .from("category")
-      .select("*")
-      .ilike("description", form.category.toUpperCase())
-      .limit(1);
-    if (categoryFetchError) throw categoryFetchError;
-    if (!category || category.length === 0) {
-      const { data: newCategory, error: categoryInsertError } = await supabase
+    let category;
+    if (typeof form.category === 'number' || !isNaN(Number(form.category))) {
+      // Si es un ID, buscar directamente
+      const { data: categoryData, error: categoryFetchError } = await supabase
         .from("category")
-        .insert([{ description: form.category.toUpperCase() }])
-        .select()
-        .single();
-      if (categoryInsertError) throw categoryInsertError;
-      category = [newCategory];
+        .select("*")
+        .eq("id", form.category)
+        .limit(1);
+      if (categoryFetchError) throw categoryFetchError;
+      if (!categoryData || categoryData.length === 0) {
+        throw new Error("Categoría no encontrada");
+      }
+      category = categoryData;
+    } else {
+      // Si es un string, buscar por descripción
+      let { data: categoryData, error: categoryFetchError } = await supabase
+        .from("category")
+        .select("*")
+        .ilike("description", String(form.category).toUpperCase())
+        .limit(1);
+      if (categoryFetchError) throw categoryFetchError;
+      if (!categoryData || categoryData.length === 0) {
+        const { data: newCategory, error: categoryInsertError } = await supabase
+          .from("category")
+          .insert([{ description: String(form.category).toUpperCase() }])
+          .select()
+          .single();
+        if (categoryInsertError) throw categoryInsertError;
+        categoryData = [newCategory];
+      }
+      category = categoryData;
     }
 
     // 4. Buscar o crear subcategoría
-    let { data: subcategory, error: subcategoryFetchError } = await supabase
-      .from("sub_category")
-      .select("*")
-      .ilike("description", form.subCategory.toUpperCase())
-      .eq("category_id", category[0].id)
-      .limit(1);
-    if (subcategoryFetchError) throw subcategoryFetchError;
-    if (!subcategory || subcategory.length === 0) {
-      const { data: newSubcategory, error: subcategoryInsertError } = await supabase
+    let subcategory;
+    if (typeof form.subCategory === 'number' || !isNaN(Number(form.subCategory))) {
+      // Si es un ID, buscar directamente
+      const { data: subcategoryData, error: subcategoryFetchError } = await supabase
         .from("sub_category")
-        .insert([{ description: form.subCategory.toUpperCase(), category_id: category[0].id }])
-        .select()
-        .single();
-      if (subcategoryInsertError) throw subcategoryInsertError;
-      subcategory = [newSubcategory];
+        .select("*")
+        .eq("id", form.subCategory)
+        .limit(1);
+      if (subcategoryFetchError) throw subcategoryFetchError;
+      if (!subcategoryData || subcategoryData.length === 0) {
+        throw new Error("Subcategoría no encontrada");
+      }
+      subcategory = subcategoryData;
+    } else {
+      // Si es un string, buscar por descripción
+      let { data: subcategoryData, error: subcategoryFetchError } = await supabase
+        .from("sub_category")
+        .select("*")
+        .ilike("description", String(form.subCategory).toUpperCase())
+        .eq("category_id", category[0].id)
+        .limit(1);
+      if (subcategoryFetchError) throw subcategoryFetchError;
+      if (!subcategoryData || subcategoryData.length === 0) {
+        const { data: newSubcategory, error: subcategoryInsertError } = await supabase
+          .from("sub_category")
+          .insert([{ description: String(form.subCategory).toUpperCase(), category_id: category[0].id }])
+          .select()
+          .single();
+        if (subcategoryInsertError) throw subcategoryInsertError;
+        subcategoryData = [newSubcategory];
+      }
+      subcategory = subcategoryData;
     }
 
     // 5. Crear operation
