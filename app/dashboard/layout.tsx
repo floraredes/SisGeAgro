@@ -107,7 +107,7 @@ export default function DashboardLayout({
 
   return (
     <CurrencyProvider>
-      <div className="flex h-screen overflow-hidden min-w-0 min-h-0">
+      <div className="flex h-screen overflow-hidden min-w-0 min-h-0 overflow-hidden">
         <MainNavigation />
         <div className="flex-1 flex flex-col w-full min-w-0 min-h-0">
           <header className="flex h-16 min-h-16 items-center justify-between border-b px-6 bg-white z-10">

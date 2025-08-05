@@ -3,36 +3,33 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth-utils"
+import dynamic from "next/dynamic"
 
 export default function HomePage() {
   const router = useRouter()
   const [checkingSession, setCheckingSession] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    const checkSessionAndRedirect = async () => {
+    const checkSession = async () => {
       try {
         const currentUser = await getCurrentUser()
-
-        if (!currentUser) {
-          setCheckingSession(false)
-          router.replace("/auth")
-          return
-        }
-
-        setCheckingSession(false)
-        if (currentUser.role === "admin") {
-          router.replace("/dashboard")
-        } else {
-          router.replace("/user-movement")
+        if (currentUser) {
+          setIsAuthenticated(true)
+          // Redirigir según el rol
+          if (currentUser.role === "admin") {
+            router.replace("/dashboard")
+          } else {
+            router.replace("/user-movement")
+          }
         }
       } catch (error) {
-        console.error("Error verificando sesión:", error)
+        // No hacer nada, mostrar landing
+      } finally {
         setCheckingSession(false)
-        router.replace("/auth")
       }
     }
-
-    checkSessionAndRedirect()
+    checkSession()
   }, [router])
 
   if (checkingSession) {
@@ -44,6 +41,11 @@ export default function HomePage() {
         </div>
       </div>
     )
+  }
+
+  if (!isAuthenticated) {
+    const LandingPage = dynamic(() => import("./LandingPage"), { ssr: false })
+    return <LandingPage />
   }
 
   return null
