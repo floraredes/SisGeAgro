@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
 
   return (
-    <div className="p-6 bg-[#F5F6FA] min-w-0 flex flex-col">
+    <div className="min-w-0 flex flex-col">
       <h2 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">Dashboard</h2>
       {/* Selector de rango de fechas */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4 items-start sm:items-end">

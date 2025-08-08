@@ -94,6 +94,17 @@ export default function DashboardLayout({
     setUnreadCount(0);
   };
 
+  // Aplicar clase al body para eliminar scroll externo
+  useEffect(() => {
+    document.body.classList.add('dashboard-page');
+    document.documentElement.classList.add('dashboard-page');
+    
+    return () => {
+      document.body.classList.remove('dashboard-page');
+      document.documentElement.classList.remove('dashboard-page');
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -107,7 +118,7 @@ export default function DashboardLayout({
 
   return (
     <CurrencyProvider>
-      <div className="flex h-screen overflow-hidden min-w-0 min-h-0 overflow-hidden">
+      <div className="flex h-screen dashboard-container dashboard-layout dashboard-scroll-container">
         <MainNavigation />
         <div className="flex-1 flex flex-col w-full min-w-0 min-h-0">
           <header className="flex h-16 min-h-16 items-center justify-between border-b px-6 bg-white z-10">
@@ -159,7 +170,7 @@ export default function DashboardLayout({
               <span className="text-sm font-medium text-gray-700">Hola, {userName}</span>
             </div>
           </header>
-          <main className="flex-1 overflow-auto min-h-0 min-w-0 p-6 bg-[#F5F6FA] flex flex-col">
+          <main className="flex-1 dashboard-main dashboard-content dashboard-scroll-content p-6 bg-[#F5F6FA] flex flex-col">
             {children}
           </main>
         </div>

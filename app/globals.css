@@ -156,3 +156,53 @@ html, body {
   height: 100%;
   /*overflow: hidden;*/
 }
+
+/* Solución definitiva para eliminar scroll externo en dashboard */
+body.dashboard-page {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+html.dashboard-page {
+  overflow: hidden !important;
+}
+
+/* Estilos específicos para el dashboard - Eliminar barra de desplazamiento externa */
+.dashboard-container {
+  overflow: hidden !important;
+}
+
+.dashboard-main {
+  overflow: auto !important;
+  height: 100%;
+}
+
+/* Asegurar que solo el contenedor interno tenga scroll */
+.dashboard-layout {
+  overflow: hidden !important;
+}
+
+.dashboard-content {
+  overflow: auto !important;
+}
+
+/* Eliminar scroll del body y html cuando estemos en dashboard */
+body.dashboard-page {
+  overflow: hidden !important;
+}
+
+html.dashboard-page {
+  overflow: hidden !important;
+}
+
+/* Forzar que solo el main tenga scroll */
+.dashboard-scroll-container {
+  overflow: hidden !important;
+}
+
+.dashboard-scroll-content {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100%;
+}
