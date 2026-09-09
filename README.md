@@ -105,14 +105,6 @@ public/         # Recursos estáticos
 
 ---
 
-<<<<<<< HEAD
-## Licencia
-
-MIT
-
----
-
-## Autor
 
 - [Tu Nombre o Equipo](https://github.com/tu-usuario)
 =======
